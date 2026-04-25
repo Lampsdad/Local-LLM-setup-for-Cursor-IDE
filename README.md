@@ -84,6 +84,60 @@ On macOS and Linux, press **Ctrl+C** to stop both the server and tunnel cleanly.
 
 ---
 
+## Using with Cursor
+
+### One-time setup
+
+**1. Open Cursor Settings**
+
+`Ctrl+Shift+J` (Windows/Linux) or `Cmd+Shift+J` (macOS), then navigate to the **Models** tab.
+
+**2. Enter a dummy API key**
+
+Cursor requires a non-empty OpenAI API key even when talking to a local server. Scroll to the **OpenAI API Key** field and enter any placeholder value (e.g. `local`). The local server ignores it entirely.
+
+**3. Set the base URL**
+
+Check the **Override OpenAI Base URL** box and paste the URL printed by the start script, with `/v1` appended:
+
+```
+https://example-words-here.trycloudflare.com/v1
+```
+
+**4. Disable built-in models**
+
+Scroll through the model list and uncheck all OpenAI (and other provider) models you don't want to accidentally use or pay for.
+
+**5. Add your model**
+
+In the **Add Model** field at the bottom of the model list, type the model alias exactly as it appears in the start script and press Enter:
+
+```
+qwen3.6-35b-a3b
+```
+
+Click **Verify** — Cursor will call `/v1/models` on your server to confirm the connection. It should show a green checkmark.
+
+### Starting a session
+
+1. Run the start script and wait for the tunnel URL to print
+2. Update the base URL in Cursor Settings → Models (see step 3 above) — **the URL changes every restart**
+3. Open a new chat (`Ctrl+L` / `Cmd+L`), click the model name in the bottom-left of the chat panel, and select `qwen3.6-35b-a3b`
+
+> The URL rotates because these are Cloudflare *quick* tunnels — no account required, but no persistent URL. If updating it every session becomes annoying, see the [named tunnel option](#security) in the Security section.
+
+### Cursor features that work with local models
+
+| Feature | Works? | Notes |
+|---|---|---|
+| Chat (`Ctrl+L`) | Yes | Full conversation with the model |
+| Inline edit (`Ctrl+K`) | Yes | Applies edits directly in the editor |
+| Composer | Yes | Multi-file edits |
+| Tab autocomplete | No | Requires a Cursor-hosted model; cannot be routed to a custom endpoint |
+| `@Codebase` context | Yes | Cursor handles the indexing; model just sees the retrieved chunks |
+
+---
+
 ## Downloading a Different Model
 
 Any GGUF file can be used. The steps are:
