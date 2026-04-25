@@ -1,0 +1,11 @@
+# Models — too large for git (30–37 GB each); use download_model scripts
+models/
+
+# Platform-specific pre-compiled binaries; use install scripts to fetch these
+llama-bin/
+
+# Runtime logs
+*.log
+
+# Claude Code project settings
+.claude/
