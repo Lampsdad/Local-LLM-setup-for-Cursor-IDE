@@ -7,11 +7,11 @@ echo  Local Model Runtime - Windows Install
 echo ============================================================
 echo.
 
-:: ── llama-bin ────────────────────────────────────────────────
+:: llama-bin
 if exist "llama-bin\llama-server.exe" (
     echo [OK] llama-bin\ already populated, skipping download.
 ) else (
-    echo [*] Fetching latest llama.cpp release from GitHub...
+    echo [*] Downloading llama.cpp binaries from GitHub...
     mkdir llama-bin 2>nul
 
     powershell -NoProfile -Command ^
@@ -34,7 +34,7 @@ if exist "llama-bin\llama-server.exe" (
     )
 )
 
-:: ── cloudflared ──────────────────────────────────────────────
+:: cloudflared
 set "CF_DIR=C:\Program Files (x86)\cloudflared"
 set "CF_EXE=%CF_DIR%\cloudflared.exe"
 
@@ -56,7 +56,7 @@ if exist "%CF_EXE%" (
     )
 )
 
-:: ── models dir ───────────────────────────────────────────────
+:: models dir
 if not exist "models\" mkdir models
 echo [OK] models\ directory ready.
 
