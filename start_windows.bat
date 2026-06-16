@@ -33,8 +33,9 @@ del "%CF_LOG%" >nul 2>&1
 echo Starting llama-server...
 start /B "" "%BINARY%" ^
     --model        "%MODEL%" ^
+    --fit          on ^
     --n-gpu-layers 99 ^
-    --ctx-size     131072 ^
+    --ctx-size     200000 ^
     --flash-attn   auto ^
     --port         %PORT% ^
     --host         0.0.0.0 ^
