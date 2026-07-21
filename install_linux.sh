@@ -24,14 +24,18 @@ else
 
     ASSET_URL=$(curl -fsSL https://api.github.com/repos/ggml-org/llama.cpp/releases/latest \
         | python3 -c "
-import sys, json
+import re, sys, json
 rel = json.load(sys.stdin)
-assets = rel['assets']
-# prefer CUDA Ubuntu x64 build; fall back to plain Ubuntu x64
-for pat in ['ubuntu.*cuda.*x64', 'linux.*cuda.*x64', 'ubuntu.*x64']:
-    import re
+assets = rel.get('assets', [])
+# New releases ship .tar.gz (not .zip). Prefer Vulkan on NVIDIA Linux when no CUDA tarball.
+patterns = [
+    (r'bin-ubuntu-vulkan-x64\.tar\.gz$', 'vulkan'),
+    (r'bin-ubuntu-x64\.tar\.gz$', 'cpu'),
+]
+for pat, _ in patterns:
     for a in assets:
-        if re.search(pat, a['name'], re.IGNORECASE) and a['name'].endswith('.zip'):
+        name = a.get('name', '')
+        if re.search(pat, name, re.IGNORECASE):
             print(a['browser_download_url']); sys.exit(0)
 print('NOT_FOUND'); sys.exit(1)
 ")
@@ -46,9 +50,16 @@ print('NOT_FOUND'); sys.exit(1)
     FILENAME=$(basename "$ASSET_URL")
     echo "Downloading $FILENAME..."
     curl -fL "$ASSET_URL" -o "llama-bin/$FILENAME"
-    unzip -q "llama-bin/$FILENAME" -d llama-bin
+    tar -xzf "llama-bin/$FILENAME" -C llama-bin
     rm "llama-bin/$FILENAME"
+    # Flatten: releases unpack to llama-<tag>/ with binaries inside
+    SUBDIR=$(find llama-bin -maxdepth 1 -type d -name 'llama-*' | head -1)
+    if [ -n "$SUBDIR" ] && [ -f "$SUBDIR/llama-server" ]; then
+        ln -sf "$(basename "$SUBDIR")/llama-server" llama-bin/llama-server
+        ln -sf "$(basename "$SUBDIR")/llama-cli" llama-bin/llama-cli
+    fi
     chmod +x llama-bin/llama-server llama-bin/llama-cli 2>/dev/null || true
+    find llama-bin -name 'llama-server' -type f -exec chmod +x {} \;
     echo "[OK] llama.cpp binaries extracted."
 fi
 
@@ -57,19 +68,12 @@ if command -v cloudflared &>/dev/null; then
     echo "[OK] cloudflared already installed."
 else
     echo "[*] Installing cloudflared..."
-    CF_BIN="/usr/local/bin/cloudflared"
-    if [ -w "$(dirname "$CF_BIN")" ]; then
-        curl -fsSL "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64" \
-            -o "$CF_BIN"
-        chmod +x "$CF_BIN"
-        echo "[OK] cloudflared installed to $CF_BIN"
-    else
-        echo "[*] Need sudo to install to /usr/local/bin..."
-        sudo curl -fsSL "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64" \
-            -o "$CF_BIN"
-        sudo chmod +x "$CF_BIN"
-        echo "[OK] cloudflared installed to $CF_BIN"
-    fi
+    CF_BIN="${HOME}/.local/bin/cloudflared"
+    mkdir -p "$(dirname "$CF_BIN")"
+    curl -fsSL "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64" \
+        -o "$CF_BIN"
+    chmod +x "$CF_BIN"
+    echo "[OK] cloudflared installed to $CF_BIN (ensure ~/.local/bin is on PATH)"
 fi
 
 # ── models dir ───────────────────────────────────────────────

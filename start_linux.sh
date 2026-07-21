@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")"
+export PATH="${HOME}/.local/bin:${PATH}"
 
 MODEL="./models/Qwen_Qwen3.6-35B-A3B-Q6_K_L.gguf"
 BINARY="./llama-bin/llama-server"
-PORT=8080
+PORT=8081
 LOG="./server.log"
 CF_LOG="./cloudflared.log"
 
@@ -19,9 +20,8 @@ if [ ! -f "$MODEL" ]; then
 fi
 
 # ── stop any running instances ───────────────────────────────
-echo "Stopping any existing instances..."
+echo "Stopping any existing llama-server (cloudflared left running for stable URL)..."
 pkill -x llama-server 2>/dev/null || true
-pkill -x cloudflared  2>/dev/null || true
 sleep 1
 
 # ── start llama-server ───────────────────────────────────────
@@ -29,7 +29,7 @@ echo "Starting llama-server..."
 "$BINARY" \
     --model        "$MODEL" \
     --n-gpu-layers 99 \
-    --ctx-size     131072 \
+    --ctx-size     200000 \
     --flash-attn   auto \
     --port         $PORT \
     --host         0.0.0.0 \
@@ -60,19 +60,19 @@ if ! command -v cloudflared &>/dev/null; then
     exit 0
 fi
 
-echo "Starting Cloudflare tunnel..."
+echo "Starting Cloudflare tunnel (skip if already running — see start-cloudflared-once.sh)..."
+if pgrep -f "cloudflared tunnel --url http://127.0.0.1:${PORT}" >/dev/null 2>&1; then
+    echo "cloudflared already running; URL unchanged."
+    if [ -f "./cloudflared.url" ]; then cat "./cloudflared.url"; fi
+    CF_PID=""
+else
 cloudflared tunnel --url "http://localhost:$PORT" >"$CF_LOG" 2>&1 &
 CF_PID=$!
 sleep 12
-
-# ── print tunnel URL ─────────────────────────────────────────
-echo
-echo "============================================================"
-grep -o 'https://[^ ]*trycloudflare\.com' "$CF_LOG" | head -1 | xargs -I{} echo " Base URL: {}/v1"
-echo "============================================================"
-echo
+grep -o 'https://[^ ]*trycloudflare\.com' "$CF_LOG" | head -1 | tee cloudflared.url.tmp | xargs -I{} echo "{}/v1" | tee ./cloudflared.url
+fi
 echo "Press Ctrl+C to stop everything."
 
 # ── keep running until interrupted ───────────────────────────
-trap "echo; echo 'Shutting down...'; kill $SERVER_PID $CF_PID 2>/dev/null; exit 0" INT TERM
+trap 'echo; echo Shutting down...; kill $SERVER_PID 2>/dev/null; [ -n "${CF_PID:-}" ] && kill $CF_PID 2>/dev/null; exit 0' INT TERM
 wait $SERVER_PID

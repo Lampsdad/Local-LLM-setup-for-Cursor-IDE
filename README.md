@@ -69,9 +69,9 @@ Launches the server and exposes it via Cloudflare tunnel. Run this every time yo
 | Step | What it does |
 |---|---|
 | Kill old processes | Stops any running `llama-server` / `cloudflared` |
-| Start server | Launches `llama-server` on `localhost:8080` with 128K context, KV cache quantized to Q4_0, all layers on GPU |
+| Start server | Launches `llama-server` on `localhost:8081` (8080 is used by signal-cli on the node) with **200K** context, KV cache quantized to Q4_0, all layers on GPU |
 | Health poll | Waits until the server responds at `/health` (takes 1–2 min to load; 2–4 min on Apple Silicon) |
-| Cloudflare tunnel | Starts a quick tunnel (no account needed) pointing to `localhost:8080` |
+| Cloudflare tunnel | Starts a quick tunnel (no account needed) pointing to `localhost:8081` |
 | Print URL | Prints the public `trycloudflare.com` URL |
 
 Once running, set your client's **OpenAI base URL** to the printed URL + `/v1`, e.g.:
@@ -211,7 +211,7 @@ The start scripts use these settings by default:
 | Flag | Value | Notes |
 |---|---|---|
 | `--n-gpu-layers` | 99 | All layers on GPU; lower if VRAM OOM |
-| `--ctx-size` | 131072 | 128K context window |
+| `--ctx-size` | 200000 | 200K context window (Cursor harness) |
 | `--flash-attn` | auto | Enables Flash Attention when supported |
 | `--cache-type-k/v` | q4_0 | KV cache quantization — reduces VRAM for long contexts |
 | `--port` | 8080 | Local port; Cloudflare forwards this externally |

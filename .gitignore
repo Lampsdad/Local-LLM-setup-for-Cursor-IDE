@@ -9,3 +9,7 @@ llama-bin/
 
 # Claude Code project settings
 .claude/
+
+# Runtime/tunnel artifacts
+*.out
+cloudflared.url
