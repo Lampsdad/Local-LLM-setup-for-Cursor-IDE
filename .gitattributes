@@ -1,0 +1,14 @@
+# Line endings are load-bearing here: a .sh file checked out with CRLF
+# fails on Linux with "\r: command not found", and .bat files with LF
+# can misbehave under cmd.exe. Pin both regardless of anyone's
+# core.autocrlf setting.
+
+*         text=auto
+
+*.sh      text eol=lf
+*.bat     text eol=crlf
+*.cmd     text eol=crlf
+*.ps1     text eol=crlf
+
+*.gguf    binary
+*.dat     binary

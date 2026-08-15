@@ -13,3 +13,14 @@ llama-bin/
 # Runtime/tunnel artifacts
 *.out
 cloudflared.url
+cloudflared.url.tmp
+
+# Server API key (generated per-machine by the start scripts)
+api_key.txt
+
+# Previous llama.cpp build kept by update_llama_bin.bat
+llama-bin-backup/
+
+# Benchmark output
+benchmark_results.txt
+quant_quality.txt
