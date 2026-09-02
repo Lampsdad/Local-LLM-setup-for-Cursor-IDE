@@ -3,15 +3,20 @@ set -euo pipefail
 cd "$(dirname "$0")"
 export PATH="${HOME}/.local/bin:${PATH}"
 
+# VARIANT=base (stock) or VARIANT=ablit (abliterated).
+# Both share the MTP head and the vision projector below.
+. ./lib_variants.sh
+
 QUANT="${QUANT:-UD-Q5_K_XL}"
-MODEL="./models/Qwen3.8-27B-${QUANT}.gguf"
+MODEL="./models/${V_PREFIX}-${QUANT}.gguf"
 MMPROJ="./models/mmproj-F16.gguf"
 MTP="./models/mtp-Qwen3.8-27B-Q8_0.gguf"
 BINARY="./llama-bin/llama-server"
 PORT=8081
 LOG="./server.log"
 CF_LOG="./cloudflared.log"
-ALIAS="qwen3.8-27b"
+# Distinct per variant so Cursor cannot silently show the wrong one.
+ALIAS="$V_ALIAS"
 
 # ── pre-flight checks ────────────────────────────────────────
 if [ ! -f "$BINARY" ]; then
@@ -19,7 +24,7 @@ if [ ! -f "$BINARY" ]; then
     exit 1
 fi
 if [ ! -f "$MODEL" ]; then
-    echo "ERROR: $MODEL not found. Run ./download_model.sh first."
+    echo "ERROR: $MODEL not found. Run VARIANT=${V_ID} ./download_model.sh first."
     exit 1
 fi
 
@@ -106,7 +111,11 @@ if pgrep -f "cloudflared tunnel --url http://127.0.0.1:${PORT}" >/dev/null 2>&1;
     if [ -f "./cloudflared.url" ]; then cat "./cloudflared.url"; fi
     CF_PID=""
 else
-cloudflared tunnel --url "http://localhost:$PORT" >"$CF_LOG" 2>&1 &
+# 127.0.0.1, not localhost: the pgrep above and
+# start-cloudflared-once.sh both match on that literal string, so a
+# mismatch here meant this script never recognised its own tunnel --
+# every run started a second one and the URL changed anyway.
+cloudflared tunnel --url "http://127.0.0.1:$PORT" >"$CF_LOG" 2>&1 &
 CF_PID=$!
 sleep 12
 grep -o 'https://[^ ]*trycloudflare\.com' "$CF_LOG" | head -1 | tee cloudflared.url.tmp | xargs -I{} echo "{}/v1" | tee ./cloudflared.url

@@ -23,7 +23,9 @@ echo.
 
 :: ---- current version ----
 if exist "llama-bin\llama-server.exe" (
-    for /f "tokens=2 delims= " %%V in ('llama-bin\llama-server.exe --version 2^>^&1 ^| findstr /C:"build"') do set CURRENT=%%V
+    rem "version: 8679 (94ca829b6)" is the line we want. /C:"build"
+    rem also matches "built with Clang ..." and yields "with".
+    for /f "tokens=2 delims= " %%V in ('llama-bin\llama-server.exe --version 2^>^&1 ^| findstr /C:"version:"') do set CURRENT=%%V
     echo  Installed build : !CURRENT!
 ) else (
     echo  Installed build : none
@@ -102,7 +104,7 @@ del "%TEMP%\%ZIP%" >nul 2>&1
 :: ---- verify ----
 echo.
 echo  Verifying new build...
-llama-bin\llama-server.exe --version 2>&1 | findstr /C:"build"
+llama-bin\llama-server.exe --version 2>&1 | findstr /C:"version:"
 if errorlevel 1 (
     echo  ERROR: the new binary failed to run. Restoring backup...
     rmdir /S /Q "llama-bin" 2>nul

@@ -44,6 +44,71 @@ if you change one, re-check that case.
 `34,816 bytes/token` is `16 cached layers × 4 KV heads × 256 head-dim × 2
 (K+V) = 32,768 elements`, at q8_0's 34 bytes per 32-element block.
 
+## Model variants
+
+`lib_variants.bat` / `lib_variants.sh` are the only files that know what a
+build *is*. A third variant means adding a branch there — the download,
+start and launch scripts read repo, filename prefix and Cursor alias out
+of it and are otherwise variant-blind.
+
+**Why huihui-ai for the abliterated build.** There are on the order of
+thirty abliterated Qwen3.8-27B GGUF repos. This one was picked because
+its `UD-*` files are re-ablations of
+`unsloth/Qwen3.8-27B-GGUF` — the exact quants this repo already targeted.
+That makes the two builds directly comparable: same quant names, sizes
+within 3%, so `probe_hardware.ps1` and the README context table need no
+per-variant special-casing.
+
+**The shared MTP head is an inherited claim, not a measurement.** Both
+builds load `ggml-org`'s `mtp-Qwen3.8-27B-Q8_0.gguf` and unsloth's
+`mmproj-F16.gguf`, on the strength of huihui's model card saying "MTP and
+visual has not been modified". It is very likely fine — abliteration
+changes weight values, not tensor shapes, and speculative decoding is
+lossless regardless of how good the draft is, since the abliterated model
+is still the verifier. The realistic failure mode is a *lower draft
+acceptance rate*, showing up as reduced tok/s rather than wrong output.
+If the abliterated build is unexpectedly slow, benchmark it with and
+without the `--spec-type` block before looking anywhere else.
+
+**Ablation depth.** huihui's `UD-*` series ablates layers 18–51 and
+leaves 0–17 untouched, which is what keeps coding and tool-calling near
+stock. They also publish a `UD-DW-*` series ablating only 23–51 (less
+thorough, warns more); it is not wired up here.
+
+**The size columns** in `download_qwen3.8_27b.bat` are the actual byte
+sizes from the Hugging Face file listings on 2026-09-01, and only feed the
+free-space check. The stock column was previously off by up to 1 GB in
+both directions; re-check both if either publisher reuploads.
+
+## cmd.exe traps found the hard way
+
+An audit pass on 2026-09-01 turned these up. All were latent in shipped
+scripts; the scanner for the first one is worth re-running after edits.
+
+- **Unescaped parentheses in an `echo` inside a `( )` block.** The `)` in
+  `echo ... (merged b9180).` closed the block early and cmd printed
+  `. was unexpected at this time.` on every launch on a pre-b9180 build.
+  Hit `start_qwen3.8_27b.bat`, `install_windows.bat` and
+  `cleanup_disk.bat`. Escape as `^(` / `^)`.
+- **`::` comments inside a `( )` block.** Labels are not valid there;
+  use `rem`.
+- **`for /f` splits backquoted commands on commas.** `nvidia-smi
+  --query-gpu=name,memory.total` reaches the exe as two unknown options.
+  Quote each option whole: `nvidia-smi "--query-gpu=name,memory.total"`.
+  Only inside `for /f` — a direct invocation is fine.
+- **`llama-server --version` prints `version: 8679 (...)`, not "build".**
+  `findstr /C:"build"` matches the *`built with Clang`* line instead and
+  yields the word `with`.
+- **`timeout /t` refuses to run when stdin is redirected**, returning
+  instantly with `ERROR: Input redirection is not supported`. Any wait
+  loop built on it spins when the script is driven from another script or
+  a pipe. `:sleep` in `start_qwen3.8_27b.bat` falls back to `ping`.
+- **Bare `call foo.bat` depends on cmd searching the current directory**,
+  which `NoDefaultCurrentDirectoryInExePath=1` disables. Use
+  `call "%~dp0foo.bat"`.
+- **`if COND set A & set B` runs `set B` unconditionally.** This made the
+  download script's free-space check always assume the largest quant.
+
 ## Disk
 
 This machine runs a single ~1.86 TB volume, so it fills up. Two things

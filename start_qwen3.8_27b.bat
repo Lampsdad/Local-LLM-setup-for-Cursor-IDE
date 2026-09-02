@@ -1,9 +1,17 @@
 @echo off
 setlocal enabledelayedexpansion
 cd /d "%~dp0"
+call "%~dp0lib_ui.bat"
 
 :: ============================================================
 ::  Qwen3.8-27B on RTX 5090 (32 GB) -- tuned launch
+::
+::  Takes the variant to run as argument 1 ("base" or "ablit");
+::  launch.bat is the picker that supplies it. Everything below
+::  the variant lookup is identical for both -- the abliterated
+::  quants are re-ablations of the same unsloth GGUFs, so the
+::  sizing arithmetic and the MTP/vision files carry over
+::  unchanged. See lib_variants.bat.
 ::
 ::  Hardware this is sized for:
 ::    GPU  RTX 5090, 32606 MiB VRAM, Blackwell sm_120
@@ -22,31 +30,53 @@ cd /d "%~dp0"
 ::      model. This is the single biggest generation speedup.
 :: ============================================================
 
+:: ---- which variant? ----------------------------------------
+:: An explicit argument wins. With none, run whichever variant is
+:: actually on disk, preferring the stock one when both are.
+set "WANT=%~1"
+if not defined WANT (
+    set "WANT=base"
+    if not exist "models\Qwen3.8-27B-*.gguf" (
+        if exist "models\Huihui-Qwen3.8-27B-abliterated-*.gguf" set "WANT=ablit"
+    )
+)
+call "%~dp0lib_variants.bat" "%WANT%"
+if errorlevel 1 (
+    echo  ERROR: unknown variant "%WANT%" -- expected "base" or "ablit".
+    pause & exit /b 1
+)
+
 set BINARY=llama-bin\llama-server.exe
 set PORT=8080
 set LOG=server.log
 set CF_LOG=cloudflared-err.log
 set CF_EXE=C:\Program Files (x86)\cloudflared\cloudflared.exe
-set ALIAS=qwen3.8-27b
+:: The alias is the name Cursor lists, so the two variants must not
+:: share one -- quietly talking to the wrong model is the exact
+:: failure this picker exists to prevent.
+set ALIAS=%V_ALIAS%
 
 set MMPROJ=models\mmproj-F16.gguf
 set MTP=models\mtp-Qwen3.8-27B-Q8_0.gguf
 
 :: ---- pick whichever weight file is present, best first ----
+:: Both repos publish the same quant suffixes, so one list covers
+:: both variants -- :pick prepends the variant's filename prefix.
+::
 :: The second argument is only a fallback for machines where
 :: nvidia-smi is unavailable; normally probe_hardware.ps1 computes
 :: the context window from the GPU actually present. The fallback
 :: values assume a 32 GB card.
 set "MODEL="
-call :pick "models\Qwen3.8-27B-UD-Q5_K_XL.gguf" 131072
-call :pick "models\Qwen3.8-27B-UD-Q4_K_XL.gguf" 196608
-call :pick "models\Qwen3.8-27B-UD-Q6_K_XL.gguf" 32768
-call :pick "models\Qwen3.8-27B-Q8_0.gguf"       16384
-call :pick "models\Qwen3.8-27B-UD-IQ3_XXS.gguf" 262144
+call :pick "UD-Q5_K_XL" 131072
+call :pick "UD-Q4_K_XL" 196608
+call :pick "UD-Q6_K_XL" 32768
+call :pick "Q8_0"       16384
+call :pick "UD-IQ3_XXS" 262144
 
 if not defined MODEL (
-    echo  ERROR: no Qwen3.8-27B weights found in models\
-    echo  Run download_qwen3.8_27b.bat first.
+    echo  ERROR: no %V_LABEL% weights found in models\
+    echo  Run: download_qwen3.8_27b.bat %V_ID%
     pause & exit /b 1
 )
 
@@ -61,7 +91,7 @@ set USE_MTP=0
 if not errorlevel 1 (
     if exist "%MTP%" set USE_MTP=1
 ) else (
-    echo  [WARN] this llama.cpp build predates MTP support (merged b9180).
+    echo  [WARN] this llama.cpp build predates MTP support ^(merged b9180^).
     echo         Run update_llama_bin.bat to get the ~1.5-2x speedup.
 )
 
@@ -117,31 +147,37 @@ if %CTX% LSS 16384 (
 :: ---- tunnel authentication ----
 :: The quick-tunnel URL is public. Cursor makes you enter an API
 :: key anyway, so requiring one costs nothing and stops strangers
-:: who guess the URL from spending your GPU. Generated once and
-:: kept in api_key.txt (gitignored).
-if not exist "api_key.txt" (
-    echo Generating an API key for this server ^(api_key.txt^)...
-    powershell -NoProfile -Command ^
-        "[System.Guid]::NewGuid().ToString('N') | Set-Content -Path 'api_key.txt' -Encoding ascii -NoNewline"
+:: who guess the URL from spending your GPU. lib_api_key.bat
+:: generates one on first run, locks the file down to this user,
+:: and hands back API_KEY.
+call "%~dp0lib_api_key.bat"
+if errorlevel 1 (
+    pause & exit /b 1
 )
-set /p API_KEY=<api_key.txt
 
 echo ============================================================
-echo  Qwen3.8-27B
+echo  %V_LABEL%
 echo ------------------------------------------------------------
 echo   weights : %MODEL%
 echo   context : %CTX%  ^(sized to %VRAM_MIB% MiB VRAM^)
 echo   threads : %CORES%  ^(physical cores^)
 if "%USE_MTP%"=="1"    (echo   MTP     : enabled  ^(%MTP%^)) else (echo   MTP     : disabled)
 if "%USE_VISION%"=="1" (echo   vision  : enabled) else (echo   vision  : disabled)
+echo   alias   : %ALIAS%
 echo ============================================================
+if "%V_UNCENSORED%"=="1" (
+    echo.
+    echo  This build has had its refusal behaviour ablated. It answers
+    echo  requests the stock model declines and has had no safety
+    echo  evaluation. Keep the tunnel's API key to yourself.
+)
 echo.
 
 :: ---- stop anything already running ----
 echo Stopping any existing instances...
 taskkill /F /IM llama-server.exe >nul 2>&1
 taskkill /F /IM cloudflared.exe  >nul 2>&1
-timeout /t 2 >nul
+call :sleep 2
 
 del "%LOG%"    >nul 2>&1
 del "%CF_LOG%" >nul 2>&1
@@ -212,10 +248,12 @@ start /B "" "%BINARY%" %ARGS%
 
 :: ---- wait for readiness, but give up rather than spin forever ----
 echo Waiting for model to load (typically 1-3 min)...
+echo.
 set /a TRIES=0
 :wait_loop
-timeout /t 5 >nul
+call :sleep 5
 set /a TRIES+=1
+set /a ELAPSED=TRIES*5
 findstr /C:"server is listening" "%LOG%" >nul 2>&1
 if not errorlevel 1 goto ready
 
@@ -226,6 +264,7 @@ if not errorlevel 1 goto ready
 tasklist /FI "IMAGENAME eq llama-server.exe" 2>nul | findstr /I "llama-server.exe" >nul
 if errorlevel 1 (
     echo.
+    call :clearline
     echo  ERROR: llama-server exited during startup. Last lines of %LOG%:
     echo ------------------------------------------------------------
     powershell -NoProfile -Command "if (Test-Path '%LOG%') { Get-Content '%LOG%' -Tail 30 } else { 'no log written' }"
@@ -239,18 +278,23 @@ if errorlevel 1 (
 )
 if %TRIES% GEQ 72 (
     echo.
+    call :clearline
     echo  ERROR: timed out after 6 minutes. Check %LOG%.
     pause & exit /b 1
 )
+call :progress
 goto wait_loop
 
 :ready
-echo Server ready.
+call :clearline
+echo  %C_OK%Server ready.%C_0%
 
 :: ---- report what actually got allocated ----
 echo.
 echo  VRAM in use:
-for /f "usebackq delims=" %%M in (`nvidia-smi --query-gpu=memory.used,memory.total --format=csv,noheader`) do echo    %%M
+:: Options quoted whole: for/f re-parses the backquoted line and
+:: would otherwise split them at their commas.
+for /f "usebackq delims=" %%M in (`nvidia-smi "--query-gpu=memory.used,memory.total" "--format=csv,noheader"`) do echo    %%M
 echo.
 
 :: ---- tunnel ----
@@ -268,7 +312,7 @@ powershell -NoProfile -Command ^
 echo Waiting for tunnel URL...
 set /a TTRIES=0
 :tunnel_loop
-timeout /t 3 >nul
+call :sleep 3
 set /a TTRIES+=1
 findstr "https://.*trycloudflare\.com" "%CF_LOG%" >nul 2>&1
 if not errorlevel 1 goto got_tunnel
@@ -305,10 +349,62 @@ pause >nul
 exit /b 0
 
 :: ------------------------------------------------------------
+:: :pick <quant-suffix> <fallback-ctx>
+:: First match wins, so the calls above are ordered best-first.
 :pick
 if defined MODEL exit /b 0
-if exist %1 (
-    set "MODEL=%~1"
+set "CAND=models\%V_PREFIX%-%~1.gguf"
+if exist "%CAND%" (
+    set "MODEL=%CAND%"
     set "CTX_FALLBACK=%~2"
 )
+exit /b 0
+
+:: ------------------------------------------------------------
+:: Progress readout for the load wait, which is otherwise 1-3
+:: minutes of nothing. Redraws a single line in place where the
+:: terminal does ANSI, and degrades to a row of dots where it
+:: does not, so nothing here depends on escape codes working.
+::
+:: The stage comes from markers llama.cpp writes in a fixed
+:: order, tested last-wins: the furthest marker present is the
+:: current phase. Cheaper and steadier than parsing the tail of a
+:: file another process is appending to.
+:progress
+set "STAGE=starting up"
+findstr /C:"llama_model_loader:" "%LOG%" >nul 2>&1 && set "STAGE=reading model metadata"
+findstr /C:"load_tensors:"       "%LOG%" >nul 2>&1 && set "STAGE=loading tensors onto the GPU"
+findstr /C:"llama_context:"      "%LOG%" >nul 2>&1 && set "STAGE=allocating the KV cache"
+findstr /C:"srv    load_model:"  "%LOG%" >nul 2>&1 && set "STAGE=starting the server"
+
+set /a SP=TRIES %% 4
+if !SP!==0 set "CH=|"
+if !SP!==1 set "CH=/"
+if !SP!==2 set "CH=-"
+if !SP!==3 set "CH=\"
+
+if not defined ESC (
+    <nul set /p "=."
+    exit /b 0
+)
+<nul set /p "=%C_CLR%%C_HOME%  %C_AC%!CH!%C_0%  !STAGE!  %C_MU%!ELAPSED!s elapsed%C_0%"
+exit /b 0
+
+:clearline
+if defined ESC <nul set /p "=%C_CLR%%C_HOME%"
+if not defined ESC echo.
+exit /b 0
+
+:: ------------------------------------------------------------
+:: :sleep <seconds>
+:: timeout /t refuses to run at all when stdin is redirected --
+:: "ERROR: Input redirection is not supported, exiting the process
+:: immediately" -- which is exactly the case when this script is
+:: driven from another script, from CI, or through a pipe. It then
+:: returns instantly and the wait loop spins. ping has no console
+:: requirement, so it covers that case.
+:sleep
+timeout /t %~1 /nobreak >nul 2>nul && exit /b 0
+set /a PN=%~1+1
+ping -n !PN! 127.0.0.1 >nul 2>nul
 exit /b 0

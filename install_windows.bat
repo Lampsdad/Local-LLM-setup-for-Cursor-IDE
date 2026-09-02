@@ -22,7 +22,7 @@ if exist "llama-bin\llama-server.exe" (
     if errorlevel 1 (
         echo.
         echo [WARN] This build predates MTP speculative decoding
-        echo        (merged in b9180, 2026-05-16). Qwen3.8-27B will
+        echo        ^(merged in b9180, 2026-05-16^). Qwen3.8-27B will
         echo        run but you lose a large generation speedup.
         echo        Run update_llama_bin.bat to upgrade.
     )
@@ -99,9 +99,11 @@ if errorlevel 1 echo [WARN] nvidia-smi not found -- is the NVIDIA driver install
 echo.
 echo ============================================================
 echo  Setup complete. Next steps:
-echo    1. cleanup_disk.bat            -- free space if needed
-echo    2. download_qwen3.8_27b.bat    -- weights + MTP head + vision
-echo    3. start_qwen3.8_27b.bat       -- launch server + tunnel
+echo    qwen update      -- upgrade llama.cpp if MTP is unavailable
+echo    qwen get both    -- stock and abliterated weights
+echo    qwen start       -- pick one and serve it
+echo.
+echo  Or just run  qwen  for a status board and a menu.
 echo ============================================================
 echo.
 pause

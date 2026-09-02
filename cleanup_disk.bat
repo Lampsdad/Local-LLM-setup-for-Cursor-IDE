@@ -73,7 +73,7 @@ echo.
 for /f "usebackq delims=" %%F in (`powershell -NoProfile -Command ^
     "[math]::Round((Get-PSDrive C).Free/1GB,1)"`) do set FREE2=%%F
 echo ============================================================
-echo  Free space on C: : %FREE2% GB  (was %FREE% GB)
+echo  Free space on C: : %FREE2% GB  ^(was %FREE% GB^)
 echo.
 echo  Next: download_qwen3.8_27b.bat
 echo ============================================================

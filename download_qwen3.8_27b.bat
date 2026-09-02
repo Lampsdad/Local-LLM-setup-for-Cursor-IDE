@@ -5,14 +5,19 @@ cd /d "%~dp0"
 :: ============================================================
 ::  Download: Qwen3.8-27B  (released 2026-08-05)
 ::
+::  Takes the variant as argument 1 ("base" or "ablit") and asks
+::  if it is missing. launch.bat supplies it.
+::
 ::  Three separate files make up a full install:
-::    1. weights   -- unsloth/Qwen3.8-27B-GGUF   (UD dynamic quants)
+::    1. weights   -- per variant, see lib_variants.bat
 ::    2. MTP head  -- ggml-org/Qwen3.8-27B-GGUF  (speculative decoding)
 ::    3. mmproj    -- unsloth/Qwen3.8-27B-GGUF   (vision encoder)
 ::
-::  The MTP head is only published by ggml-org, so it is paired
-::  with unsloth weights. Both are conversions of the same
-::  Qwen/Qwen3.8-27B checkpoint, so vocab and hidden dims match.
+::  Files 2 and 3 come from the same place for BOTH variants and
+::  are downloaded once. huihui-ai ablates the language layers of
+::  unsloth's own UD quants and states the MTP head and vision
+::  tower are left untouched, so the stock ones stay correct --
+::  the second variant costs ~21 GB, not ~25.
 ::
 ::  NOTE: Qwen3.8-27B has a 248,320-token vocab with UNTIED
 ::  embeddings -- the embed + output tensors alone are ~2.5B
@@ -20,38 +25,71 @@ cd /d "%~dp0"
 ::  precision; plain Q4_K_M does not. Prefer the UD-*_XL files.
 :: ============================================================
 
-set BASE_REPO=unsloth/Qwen3.8-27B-GGUF
+:: ---- which variant? ----------------------------------------
+set "WANT=%~1"
+if not defined WANT (
+    echo  Which build?
+    echo.
+    echo    [1] Qwen3.8-27B              stock Qwen release
+    echo    [2] Qwen3.8-27B abliterated  refusal behaviour removed
+    echo.
+    set /p VCHOICE="Enter choice [1-2] (default=1): "
+    if "!VCHOICE!"=="2" (set "WANT=ablit") else (set "WANT=base")
+)
+call "%~dp0lib_variants.bat" "%WANT%"
+if errorlevel 1 (
+    echo  ERROR: unknown variant "%WANT%" -- expected "base" or "ablit".
+    pause & exit /b 1
+)
+
+set BASE_REPO=%V_REPO%
 set MTP_REPO=ggml-org/Qwen3.8-27B-GGUF
+set VISION_REPO=unsloth/Qwen3.8-27B-GGUF
 
 echo ============================================================
-echo  Download: Qwen3.8-27B
+echo  Download: %V_LABEL%
+echo  Source: %BASE_REPO%
 echo  Target: RTX 5090 (32 GB VRAM)
 echo ============================================================
 echo.
+:: Same quant names in both repos, slightly different bytes on
+:: disk (huihui requantizes after ablating), so carry both size
+:: columns. Taken from the Hugging Face file listings on
+:: 2026-09-01; they drive the menu text and the free-space check.
+if "%V_ID%"=="ablit" (
+    set "SZ1=20.7" & set "SZ2=17.4" & set "SZ3=24.8" & set "SZ4=11.0" & set "SZ5=29.0"
+) else (
+    set "SZ1=20.9" & set "SZ2=17.6" & set "SZ3=25.3" & set "SZ4=10.9" & set "SZ5=29.0"
+)
+
 echo  Weight quant options:
 echo.
-echo    [1] UD-Q5_K_XL   20.2 GB  recommended -- best quality that
+echo    [1] UD-Q5_K_XL   !SZ1! GB  recommended -- best quality that
 echo                              still leaves room for MTP + 131K ctx
-echo    [2] UD-Q4_K_XL   17.9 GB  more headroom -- reaches ~200K ctx
-echo    [3] UD-Q6_K_XL   25.9 GB  highest quality, but NO room for
+echo    [2] UD-Q4_K_XL   !SZ2! GB  more headroom -- reaches ~200K ctx
+echo    [3] UD-Q6_K_XL   !SZ3! GB  highest quality, but NO room for
 echo                              the MTP head (loses the speedup)
-echo    [4] UD-IQ3_XXS   11.9 GB  small; noticeably weaker on agentic
+echo    [4] UD-IQ3_XXS   !SZ4! GB  small; noticeably weaker on agentic
 echo                              tool-calling -- not recommended
-echo    [5] Q8_0         29.0 GB  near-lossless reference for benchmarking
+echo    [5] Q8_0         !SZ5! GB  near-lossless reference for benchmarking
 echo.
 set /p CHOICE="Enter choice [1-5] (default=1): "
 if "%CHOICE%"=="" set CHOICE=1
 
-if "%CHOICE%"=="1" set "FILE=Qwen3.8-27B-UD-Q5_K_XL.gguf" & set "SIZE=20.2"
-if "%CHOICE%"=="2" set "FILE=Qwen3.8-27B-UD-Q4_K_XL.gguf" & set "SIZE=17.9"
-if "%CHOICE%"=="3" set "FILE=Qwen3.8-27B-UD-Q6_K_XL.gguf" & set "SIZE=25.9"
-if "%CHOICE%"=="4" set "FILE=Qwen3.8-27B-UD-IQ3_XXS.gguf" & set "SIZE=11.9"
-if "%CHOICE%"=="5" set "FILE=Qwen3.8-27B-Q8_0.gguf"       & set "SIZE=29.0"
+:: The parentheses are load-bearing: "if COND a & b" runs b
+:: unconditionally, so an unbracketed second set here would leave
+:: SIZE holding the last line's value whatever you picked.
+if "%CHOICE%"=="1" ( set "QUANT=UD-Q5_K_XL" & set "SIZE=!SZ1!" )
+if "%CHOICE%"=="2" ( set "QUANT=UD-Q4_K_XL" & set "SIZE=!SZ2!" )
+if "%CHOICE%"=="3" ( set "QUANT=UD-Q6_K_XL" & set "SIZE=!SZ3!" )
+if "%CHOICE%"=="4" ( set "QUANT=UD-IQ3_XXS" & set "SIZE=!SZ4!" )
+if "%CHOICE%"=="5" ( set "QUANT=Q8_0"       & set "SIZE=!SZ5!" )
 
-if not defined FILE (
+if not defined QUANT (
     echo  Invalid choice.
     pause & exit /b 1
 )
+set "FILE=%V_PREFIX%-%QUANT%.gguf"
 
 :: ---- MTP head sizing ----
 :: Q8_0 head (3.2 GB) is the quality pick. With a Q6_K_XL base
@@ -112,7 +150,7 @@ if not exist "models" mkdir "models"
 call :fetch "%BASE_REPO%" "%FILE%"
 if errorlevel 1 goto failed
 
-call :fetch "%BASE_REPO%" "mmproj-F16.gguf"
+call :fetch "%VISION_REPO%" "mmproj-F16.gguf"
 if errorlevel 1 goto failed
 
 if defined MTP_FILE (
@@ -122,13 +160,14 @@ if defined MTP_FILE (
 
 echo.
 echo ============================================================
-echo  Download complete.
+echo  Download complete: %FILE%
 echo.
-echo  Set the model in start_qwen3.8_27b.bat if you did not pick
-echo  the default:
-echo      set MODEL=models\%FILE%
+echo  Launch it with:
+echo      launch.bat            ^(picks between installed builds^)
+echo  or  start_qwen3.8_27b.bat %V_ID%
 echo.
-echo  Then run: start_qwen3.8_27b.bat
+echo  The start script finds the quant on its own -- nothing to
+echo  edit if you did not take the default.
 echo ============================================================
 pause
 exit /b 0

@@ -2,7 +2,8 @@
 
 Run **Qwen3.8-27B** on your own GPU and use it inside Cursor as a drop-in
 OpenAI-compatible model — with MTP speculative decoding, vision, and a
-131K context window on a single 32 GB card.
+131K context window on a single 32 GB card. Stock or abliterated, picked
+at launch.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
@@ -10,12 +11,12 @@ OpenAI-compatible model — with MTP speculative decoding, vision, and a
 ![Model](https://img.shields.io/badge/model-Qwen3.8--27B-purple)
 
 ```bat
-run.bat
+qwen
 ```
 
-One command on Windows. It works out which step you are on — install,
-upgrade, download, or launch — and runs it. macOS and Linux are a
-three-script equivalent, shown below.
+One command on Windows. It prints what is installed, downloaded and
+running, tells you the one thing to do next, and gives you a menu.
+macOS and Linux are a three-script equivalent, shown below.
 
 ---
 
@@ -91,16 +92,59 @@ needed there.
 ### Windows
 
 ```bat
-run.bat
+qwen              :: status board and menu
+qwen status       :: just the board
+qwen setup        :: llama.cpp, cloudflared, models\
+qwen update       :: upgrade llama.cpp (needed for MTP)
+qwen get both     :: download the stock and abliterated weights
+qwen start        :: pick a build and serve it
+qwen stop         :: stop the server and the tunnel
+qwen key show     :: print the API key for Cursor
 ```
 
-Or drive the steps yourself:
+`qwen` with no argument prints a board like this:
+
+```
+ ------------------------------------------------------------
+  llama.cpp      installed  build 9431
+  MTP support    available
+  cloudflared    installed
+  GPU            NVIDIA GeForce RTX 5090, 32607 MiB
+  disk free      392 GB
+ ------------------------------------------------------------
+  Qwen3.8-27B    UD-Q5_K_XL
+   abliterated   UD-Q5_K_XL
+  shared files   MTP head   vision
+ ------------------------------------------------------------
+  server         stopped
+  API key        xxxxxx...xxxx   qwen key show
+  tunnel         none
+ ------------------------------------------------------------
+
+ Next:  qwen start    serve a model to Cursor
+```
+
+The `Next:` line is the first unmet dependency, so following it
+repeatedly walks you from an empty checkout to a served model. Colour
+is automatic and honours `NO_COLOR`.
+
+`run.bat` still works and does the same job. Or drive the steps
+yourself:
 
 ```bat
 install_windows.bat         :: one-time: llama.cpp, cloudflared, models\
 update_llama_bin.bat        :: get a build with MTP support (b9180+)
-download_qwen3.8_27b.bat    :: weights + MTP head + vision projector
-start_qwen3.8_27b.bat       :: launch server + tunnel
+launch.bat                  :: pick a build, download if needed, serve it
+```
+
+`launch.bat` is the model picker. It lists both builds with whatever is
+already on disk, fetches the one you choose if it is missing, and hands
+off to the tuned launcher. Skip the menu with `launch.bat base` or
+`launch.bat ablit`. The steps underneath it still work on their own:
+
+```bat
+download_qwen3.8_27b.bat ablit    :: or base; asks if you omit it
+start_qwen3.8_27b.bat ablit       :: or base; defaults to what is on disk
 ```
 
 ### macOS
@@ -111,6 +155,13 @@ start_qwen3.8_27b.bat       :: launch server + tunnel
 ./start_mac.sh
 ```
 
+There is no menu on the shell path — select the build with `VARIANT`:
+
+```bash
+VARIANT=ablit ./download_model.sh
+VARIANT=ablit ./start_mac.sh      # or start_linux.sh / start_fedora.sh
+```
+
 ### Linux
 
 ```bash
@@ -119,8 +170,8 @@ start_qwen3.8_27b.bat       :: launch server + tunnel
 ./start_linux.sh             # or ./start_fedora.sh
 ```
 
-All three shell paths support MTP, vision, and the generated API key,
-and size context with `--fit on`. `slurm-llama.sh` runs the same server
+All three shell paths support MTP, vision, both builds, and the
+generated API key, and size context with `--fit on`. `slurm-llama.sh` runs the same server
 as a Slurm batch job so the GPU shows as allocated in `squeue`.
 
 ---
@@ -177,6 +228,47 @@ default.
 
 ---
 
+## Choosing a build
+
+Two variants are wired up. `launch.bat` shows both, marks which are on
+disk, and downloads the one you pick.
+
+| | Stock | Abliterated |
+|---|---|---|
+| Weights | [`unsloth/Qwen3.8-27B-GGUF`](https://huggingface.co/unsloth/Qwen3.8-27B-GGUF) | [`huihui-ai/Huihui-Qwen3.8-27B-abliterated-GGUF`](https://huggingface.co/huihui-ai/Huihui-Qwen3.8-27B-abliterated-GGUF) |
+| Cursor model name | `qwen3.8-27b` | `qwen3.8-27b-abliterated` |
+| Refusal behaviour | as Qwen shipped it | ablated |
+| Weights on disk | ~20 GB | ~21 GB |
+| `launch.bat` argument | `base` | `ablit` |
+
+**They cost less together than apart.** huihui-ai's `UD-*` quants are
+re-ablations of the same unsloth GGUFs this repo already used, with the
+ablation confined to layers 18–51 and the MTP head and vision tower left
+alone. So both builds share one copy of `mtp-Qwen3.8-27B-Q8_0.gguf`
+(3.2 GB) and `mmproj-F16.gguf` (0.93 GB) — the second build you download
+is weights-only. It also means the quant names, the file sizes, and the
+context table above apply unchanged to both.
+
+**Only one runs at a time.** They share port 8080, and the start script
+stops any running server before starting the next, so `launch.bat` is a
+switch rather than a way to serve both at once. The distinct `--alias`
+values are what keep them apart in Cursor's model list — you will not
+silently be talking to the other one.
+
+**What abliteration actually costs.** It is refusal-direction ablation,
+not fine-tuning: the refusal direction is projected out of the residual
+stream. Keeping layers 0–17 untouched is what preserves most of the
+coding and tool-calling ability, but this is still a modified model with
+no published evaluation of its behaviour, and it will answer things the
+stock build declines. If you expose it through the Cloudflare tunnel,
+the generated API key is the only thing between it and the open
+internet — see [Security](#security).
+
+Reach for the stock build unless you have a specific reason not to; it is
+what the tuning numbers below were measured on.
+
+---
+
 ## Choosing a quant
 
 | Quant | Size | Est. KLD vs BF16 | Notes |
@@ -223,7 +315,9 @@ total                     ~29.5 GiB   of ~30.3 GiB usable
 2. **API key** — paste the key the start script prints (from
    `api_key.txt`). Requests without it are rejected.
 3. **Add model** — type `qwen3.8-27b` in *Add Model*, press Enter, click
-   **Verify**.
+   **Verify**. If you also run the abliterated build, add
+   `qwen3.8-27b-abliterated` as a second model; the launcher prints which
+   name the running server answers to.
 4. Uncheck provider models you don't want to hit by accident.
 
 **Every session:** the quick-tunnel URL changes on restart, so update the
@@ -252,14 +346,28 @@ alone. Worth the fifteen minutes if you use this daily.
 
 The quick-tunnel URL is **public** — anyone who guesses or scrapes the
 hostname can reach it. Every start script therefore generates a random
-key into `api_key.txt` (gitignored, `chmod 600` on Unix) and passes it via
-`--api-key-file`. Requests without it are rejected.
+key into `api_key.txt` and passes it via `--api-key-file`. Requests
+without it are rejected. Cursor makes you fill in an API-key field
+anyway, so this costs nothing.
 
-Cursor makes you fill in an API-key field anyway, so this costs nothing.
+The key is 24 bytes from the platform CSPRNG, and the file is locked to
+your account on both platforms — `chmod 600` on Unix, and on Windows
+`icacls /inheritance:r /grant:r` so other accounts on the machine cannot
+read it. That lockdown is reapplied on every launch, so a key written
+before this existed gets fixed the next time you start the server.
 
-To rotate the key, delete `api_key.txt` and restart — a new one is
-generated. Note that the server also binds `0.0.0.0`, so the key is what
-protects you on any shared network, not just over the tunnel.
+```bat
+qwen key show           :: print it (also generates it the first time)
+qwen key rotate         :: throw it away and make a new one
+qwen key set MY-SECRET  :: use a passphrase you choose instead
+```
+
+`qwen key set` accepts anything on one line — llama-server compares it
+verbatim. Rotating or setting takes effect on the next server start, and
+you have to paste the new value into Cursor.
+
+The server also binds `0.0.0.0`, so the key is what protects you on any
+shared network, not just over the tunnel.
 
 ---
 
@@ -267,12 +375,17 @@ protects you on any shared network, not just over the tunnel.
 
 | Script | Purpose |
 |---|---|
-| `run.bat` | Windows entry point. Detects your state and runs the right step. |
+| `qwen.bat` | The CLI. Status board, menu, and a verb for every step. Delegates to the scripts below. |
+| `run.bat` | Older Windows entry point. Detects your state and runs the right step. |
+| `launch.bat` | Model picker: stock or abliterated, downloading first if needed. Takes `base` / `ablit` to skip the menu. |
 | `install_windows.bat` | One-time setup: llama.cpp binaries, cloudflared, `models/`. Pinned to the CUDA 13.3 x64 asset. |
 | `install_mac.sh` / `install_linux.sh` / `install_fedora.sh` | Same, per platform. |
 | `update_llama_bin.bat` | Upgrade llama.cpp to the latest release, backing up the old build. Verifies MTP support afterward. |
-| `download_qwen3.8_27b.bat` / `download_model.sh` | Weights + MTP head + vision projector. Resumable. |
-| `start_qwen3.8_27b.bat` | Tuned Windows launcher. Auto-detects quant, MTP, vision, VRAM, and cores. |
+| `download_qwen3.8_27b.bat` / `download_model.sh` | Weights + MTP head + vision projector, for one build. Resumable. |
+| `start_qwen3.8_27b.bat` | Tuned Windows launcher. Auto-detects build, quant, MTP, vision, VRAM, and cores. |
+| `lib_variants.bat` / `.sh` | Definition of each build — repo, filename prefix, Cursor alias. Add a third variant here. |
+| `lib_api_key.bat` / `lib_api_key.sh` | Generates the API key, locks the file to your account, hands back `API_KEY`. |
+| `lib_ui.bat` | ANSI palette for the CLI. Degrades to empty strings under `NO_COLOR`. |
 | `start_mac.sh` / `start_linux.sh` / `start_fedora.sh` | Same, per platform, using `--fit on`. |
 | `slurm-llama.sh` | Run the server as a Slurm job so the GPU shows as allocated. |
 | `probe_hardware.ps1` | Reads VRAM/cores and computes the context window that fits. |

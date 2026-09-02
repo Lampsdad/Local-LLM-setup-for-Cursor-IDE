@@ -15,8 +15,11 @@ export PATH="${HOME}/.local/bin:${PATH}"
 cd "${HOME}/research/Local-LLM-setup-for-cursor"
 
 PORT=8081
+# VARIANT=base (stock) or VARIANT=ablit (abliterated).
+. ./lib_variants.sh
+
 QUANT="${QUANT:-UD-Q5_K_XL}"
-MODEL="./models/Qwen3.8-27B-${QUANT}.gguf"
+MODEL="./models/${V_PREFIX}-${QUANT}.gguf"
 MMPROJ="./models/mmproj-F16.gguf"
 MTP="./models/mtp-Qwen3.8-27B-Q8_0.gguf"
 BINARY="./llama-bin/llama-server"
@@ -55,7 +58,7 @@ exec "$BINARY" \
   --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.0 \
   --port "$PORT" \
   --host 0.0.0.0 \
-  --alias "qwen3.8-27b" \
+  --alias "$V_ALIAS" \
   --api-key-file "$API_KEY_FILE" \
   "${EXTRA[@]}" \
   --log-file "$LOG"

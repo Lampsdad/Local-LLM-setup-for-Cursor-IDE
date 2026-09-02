@@ -6,24 +6,34 @@ cd "$(dirname "$0")"
 #  Download Qwen3.8-27B (released 2026-08-05).
 #
 #  Three files make a full install:
-#    weights  -- unsloth/Qwen3.8-27B-GGUF   (UD dynamic quants)
+#    weights  -- per variant, see lib_variants.sh
 #    MTP head -- ggml-org/Qwen3.8-27B-GGUF  (speculative decoding)
 #    mmproj   -- unsloth/Qwen3.8-27B-GGUF   (vision encoder)
 #
-#  Override the quant with QUANT=..., e.g.
+#  The MTP head and the vision projector are shared by both
+#  variants and fetched once: huihui-ai ablates the language
+#  layers of unsloth's own UD quants and leaves those two
+#  untouched.
+#
+#  Override with QUANT=... and VARIANT=..., e.g.
 #    QUANT=UD-Q4_K_XL ./download_model.sh
+#    VARIANT=ablit ./download_model.sh
 # ============================================================
 
-BASE_REPO="unsloth/Qwen3.8-27B-GGUF"
+. ./lib_variants.sh
+
+BASE_REPO="$V_REPO"
 MTP_REPO="ggml-org/Qwen3.8-27B-GGUF"
+VISION_REPO="unsloth/Qwen3.8-27B-GGUF"
 
 QUANT="${QUANT:-UD-Q5_K_XL}"
-FILE="Qwen3.8-27B-${QUANT}.gguf"
+FILE="${V_PREFIX}-${QUANT}.gguf"
 MMPROJ="mmproj-F16.gguf"
 MTP="mtp-Qwen3.8-27B-Q8_0.gguf"
 
 echo "============================================================"
-echo " Download: Qwen3.8-27B (${QUANT})"
+echo " Download: ${V_LABEL} (${QUANT})"
+echo " Source: ${BASE_REPO}"
 echo "============================================================"
 echo
 
@@ -57,8 +67,8 @@ EOF
 }
 
 fetch "$BASE_REPO" "$FILE"
-fetch "$BASE_REPO" "$MMPROJ"
+fetch "$VISION_REPO" "$MMPROJ"
 fetch "$MTP_REPO"  "$MTP"
 
 echo
-echo "Done. Launch with ./start_linux.sh (or start_mac.sh / start_fedora.sh)."
+echo "Done. Launch with VARIANT=${V_ID} ./start_linux.sh (or start_mac.sh / start_fedora.sh)."
