@@ -85,8 +85,12 @@ SERVER_PID=$!
 
 # ── wait for server to be ready (health poll) ────────────────
 echo "Waiting for server to load (1-2 min for a 30 GB model)..."
-until curl -sf -H "Authorization: Bearer $API_KEY" \
-        "http://localhost:$PORT/health" >/dev/null 2>&1; do
+# The key goes to curl through a config on stdin rather than -H:
+# argv is world-readable in /proc, and slurm-llama.sh runs this same
+# poll on a shared cluster node. printf is a shell builtin, so the
+# key never reaches another process's command line.
+until printf 'header = "Authorization: Bearer %s"\n' "$API_KEY" \
+        | curl -sf -K - "http://localhost:$PORT/health" >/dev/null 2>&1; do
     sleep 5
     # abort if server process died
     if ! kill -0 $SERVER_PID 2>/dev/null; then
