@@ -163,8 +163,8 @@ if defined Q_ABL  (set "ST_ABL_S=%C_OK%!Q_ABL!%C_0%")  else (set "ST_ABL_S=%C_MU
 
 :: Both builds share these two, so they are their own row rather
 :: than being counted against either one.
-if exist "models\mtp-Qwen3.8-27B-Q8_0.gguf" (set "ST_SHARED_S=%C_OK%MTP head%C_0%") else (set "ST_SHARED_S=%C_MU%MTP head%C_0%")
-if exist "models\mmproj-F16.gguf" (set "ST_SHARED_S=!ST_SHARED_S!   %C_OK%vision%C_0%") else (set "ST_SHARED_S=!ST_SHARED_S!   %C_MU%vision%C_0%")
+if exist "models\mtp-Qwen3.8-27B-Q8_0.gguf" (set "ST_SHARED_S=%C_OK%MTP head%C_0%") else (set "ST_SHARED_S=%C_MU%no MTP head%C_0%")
+if exist "models\mmproj-F16.gguf" (set "ST_SHARED_S=!ST_SHARED_S!   %C_OK%vision%C_0%") else (set "ST_SHARED_S=!ST_SHARED_S!   %C_MU%no vision%C_0%")
 
 :: ---- server ----
 set "ST_RUN=0"
