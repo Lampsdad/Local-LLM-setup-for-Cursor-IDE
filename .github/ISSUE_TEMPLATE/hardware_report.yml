@@ -1,0 +1,55 @@
+name: Hardware report
+description: Tell us it worked (or did not) on a card that is not in the README table.
+labels: [hardware]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The context-window table in the README is computed, and only the
+        RTX 5090 row is hand-validated. Real numbers from other cards are
+        the single most useful thing you can contribute.
+
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU and VRAM
+      placeholder: RTX 4090, 24 GB
+    validations:
+      required: true
+
+  - type: input
+    id: quant
+    attributes:
+      label: Quant
+      placeholder: UD-Q4_K_XL
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mtp
+    attributes:
+      label: MTP head loaded
+      options: ["Yes", "No"]
+    validations:
+      required: true
+
+  - type: input
+    id: ctx
+    attributes:
+      label: Context window that actually loaded
+      placeholder: 72K
+    validations:
+      required: true
+
+  - type: input
+    id: speed
+    attributes:
+      label: Generation speed
+      description: tok/s from the server log or `benchmark_qwen3.8`.
+      placeholder: 38 tok/s
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: OOM at a larger window? Sysmem fallback? Draft acceptance rate?

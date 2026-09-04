@@ -1,0 +1,20 @@
+name: Feature request
+description: A model variant, platform or flag worth wiring up.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What you want
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it belongs here
+      description: >
+        This repo tunes one model family well rather than supporting every
+        model. Say why this fits that goal.
+    validations:
+      required: true

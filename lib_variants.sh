@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Sourced by the download / start scripts. Shell twin of
 # lib_variants.bat -- see that file for why the two variants
 # share their MTP head and vision projector.

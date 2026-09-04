@@ -1,0 +1,83 @@
+name: Bug report
+description: Something fails to install, download, launch or serve.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing: run `qwen status` (Windows) and paste the board
+        below. It answers most of the questions here on its own.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you ran, what you expected, what you got instead.
+      placeholder: |
+        I ran `qwen start` and the server exited with ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Platform
+      options:
+        - Windows
+        - Linux (Ubuntu/Debian)
+        - Linux (Fedora/RHEL)
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+    validations:
+      required: true
+
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU and VRAM
+      placeholder: RTX 3090, 24 GB
+    validations:
+      required: true
+
+  - type: input
+    id: build
+    attributes:
+      label: llama.cpp build number
+      description: '`llama-bin\llama-server.exe --version`. MTP needs b9180+.'
+      placeholder: b9431
+    validations:
+      required: true
+
+  - type: dropdown
+    id: variant
+    attributes:
+      label: Which build
+      options:
+        - Stock (qwen3.8-27b)
+        - Abliterated (qwen3.8-27b-abliterated)
+    validations:
+      required: true
+
+  - type: input
+    id: quant
+    attributes:
+      label: Quant
+      placeholder: UD-Q5_K_XL
+    validations:
+      required: true
+
+  - type: textarea
+    id: status
+    attributes:
+      label: Output of `qwen status`
+      description: Windows only. Skip on macOS/Linux.
+      render: text
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant part of server.log
+      description: >
+        The error and ~20 lines before it. Do NOT paste your API key --
+        scrub anything from api_key.txt.
+      render: text

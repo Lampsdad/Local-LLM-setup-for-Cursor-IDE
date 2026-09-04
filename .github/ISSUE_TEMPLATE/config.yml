@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: llama.cpp itself
+    url: https://github.com/ggml-org/llama.cpp/issues
+    about: Crashes inside llama-server, CUDA errors and MTP bugs belong upstream.
+  - name: Cursor
+    url: https://forum.cursor.com/
+    about: Cursor's UI, Tab autocomplete and account issues are not from this repo.

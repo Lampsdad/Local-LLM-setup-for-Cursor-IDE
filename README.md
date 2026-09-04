@@ -1,11 +1,14 @@
 # Local LLM setup for Cursor IDE
 
-Run **Qwen3.8-27B** on your own GPU and use it inside Cursor as a drop-in
-OpenAI-compatible model — with MTP speculative decoding, vision, and a
-131K context window on a single 32 GB card. Stock or abliterated, picked
-at launch.
+**Run Qwen3.8-27B locally on your own GPU and use it inside Cursor as a
+free, private, drop-in replacement for GPT and Claude.** A self-hosted,
+OpenAI-compatible llama.cpp server with MTP speculative decoding, vision,
+and a 131K context window on a single 32 GB card — no subscription, no
+code leaving your machine. Stock or abliterated, picked at launch.
 
+[![CI](https://github.com/Lampsdad/Local-LLM-setup-for-Cursor-IDE/actions/workflows/ci.yml/badge.svg)](https://github.com/Lampsdad/Local-LLM-setup-for-Cursor-IDE/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/Lampsdad/Local-LLM-setup-for-Cursor-IDE?style=flat)](https://github.com/Lampsdad/Local-LLM-setup-for-Cursor-IDE/stargazers)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
 ![llama.cpp](https://img.shields.io/badge/llama.cpp-b9180%2B-orange)
 ![Model](https://img.shields.io/badge/model-Qwen3.8--27B-purple)
@@ -17,6 +20,19 @@ qwen
 One command on Windows. It prints what is installed, downloaded and
 running, tells you the one thing to do next, and gives you a menu.
 macOS and Linux are a three-script equivalent, shown below.
+
+**Contents** — [Why not Ollama?](#why-not-just-use-ollama-or-lm-studio) ·
+[Will this run on my GPU?](#will-this-run-on-my-gpu) ·
+[Quick start](#quick-start) ·
+[Why Qwen3.8 is different](#what-makes-qwen38-27b-different) ·
+[Choosing a build](#choosing-a-build) ·
+[Choosing a quant](#choosing-a-quant) ·
+[Using with Cursor](#using-with-cursor) ·
+[Security](#security) ·
+[Scripts](#scripts) ·
+[Tuned settings](#tuned-server-settings) ·
+[Troubleshooting](#troubleshooting) ·
+[FAQ](#faq)
 
 ---
 
@@ -442,6 +458,73 @@ a clean OOM instead of a 50× slowdown.
 **Cursor says the model is unreachable.** The tunnel URL rotates on every
 restart — re-paste it. If it still fails, confirm the API key in Cursor
 matches `api_key.txt`.
+
+---
+
+## FAQ
+
+**Can I use a local LLM with Cursor?** Yes. Cursor lets you override the
+OpenAI base URL and add a custom model name, which is all an
+OpenAI-compatible server needs. That is what this repo sets up.
+
+**Do I still need a Cursor subscription?** You still need a Cursor
+account, and some Cursor features are gated by your plan no matter which
+model serves the tokens. But chat, inline edit, Composer and `@Codebase`
+run against your own GPU here, so they do not consume request quota.
+
+**Does my code leave my machine?** The model runs locally, so prompts and
+completions stay on your GPU. Cursor itself still talks to Cursor's
+servers for editor features and, if you use the quick tunnel, your traffic
+is proxied through Cloudflare. For a fully local path, skip the tunnel —
+see the next question.
+
+**Can I run it without a tunnel?** The scripts support it: if `cloudflared`
+is not installed they serve on `http://localhost:8080/v1` and say so.
+Cursor's *Verify* step generally wants a URL it can reach from outside,
+which is why the tunnel exists — but any other OpenAI-compatible client
+works against localhost directly.
+
+**Does Tab autocomplete work?** No. Cursor's Tab model is hosted by Cursor
+and cannot be pointed at a custom endpoint. Chat, `Ctrl+K`, Composer and
+`@Codebase` all work.
+
+**Will it run on a 3090, 4090 or 7900 XTX (24 GB)?** Yes, but you have to
+choose between MTP and quant quality — see
+[the table above](#will-this-run-on-my-gpu). On 16 GB, pick a smaller
+model instead.
+
+**Does this work with VS Code, Continue, Cline, Roo Code, Zed or Aider?**
+Yes. The server is a plain OpenAI-compatible endpoint, so anything that
+accepts a base URL, an API key and a model name will talk to it. Only the
+Cursor-specific setup steps differ.
+
+**How fast is it?** That depends on your card, quant and draft acceptance
+rate, so this repo ships a measurement path rather than a number:
+`benchmark_qwen3.8.bat` (or `.sh`). MTP speculative decoding is the single
+largest lever — confirm it engaged before comparing anything.
+
+**Why Qwen3.8-27B and not a bigger model?** 27B at `UD-Q5_K_XL` is the
+largest capable coding model that fits a 32 GB card *while keeping the MTP
+head resident*. See [what makes it
+different](#what-makes-qwen38-27b-different).
+
+**Is the abliterated build safe to expose?** It has had its refusal
+behaviour removed and no published evaluation of its behaviour. If you
+tunnel it, your API key is the only control in front of it. Read
+[SECURITY.md](SECURITY.md) first.
+
+---
+
+## Contributing
+
+Hardware reports are the most useful contribution — the GPU table is
+computed, and only the RTX 5090 row is hand-validated. If you ran this on
+a different card, [tell us what
+loaded](../../issues/new?template=hardware_report.yml).
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for conventions, and
+[NOTES.md](NOTES.md) for the reasoning behind the tuned constants and a
+list of cmd.exe traps already found the hard way.
 
 ---
 

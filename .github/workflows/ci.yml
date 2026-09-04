@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shell:
+    name: Shell scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Syntax check every shell script
+        run: |
+          status=0
+          for f in *.sh; do
+            if bash -n "$f"; then
+              echo "ok   $f"
+            else
+              echo "FAIL $f"
+              status=1
+            fi
+          done
+          exit $status
+
+      - name: ShellCheck
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck
+          shellcheck --severity=error --external-sources *.sh
+
+  line-endings:
+    name: Line endings
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # A .sh checked out with CRLF dies on Linux with "\r: command not
+      # found"; a .bat with LF can misbehave under cmd.exe. .gitattributes
+      # pins both -- this proves the pinning still holds after a checkout.
+      - name: .sh must be LF, .bat and .ps1 must be CRLF
+        run: |
+          status=0
+          for f in *.sh; do
+            if grep -qU $'\r' "$f"; then
+              echo "FAIL $f contains CR -- must be LF only"
+              status=1
+            fi
+          done
+          for f in *.bat *.ps1; do
+            if ! grep -qU $'\r' "$f"; then
+              echo "FAIL $f has no CR -- must be CRLF"
+              status=1
+            fi
+          done
+          [ $status -eq 0 ] && echo "All line endings correct"
+          exit $status
+
+  hygiene:
+    name: Repository hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Weights, binaries, logs and the generated key must never be
+      # committed. .gitignore covers them; this catches a `git add -f`.
+      - name: No secrets, weights, binaries or logs are tracked
+        run: |
+          status=0
+          while IFS= read -r f; do
+            case "$f" in
+              api_key.txt|*.gguf|*.dat|*.log|*.exe|*.dll|*.zip|llama-bin/*|models/*)
+                echo "FAIL $f must not be tracked"
+                status=1
+                ;;
+            esac
+          done < <(git ls-files)
+          [ $status -eq 0 ] && echo "Nothing forbidden is tracked"
+          exit $status
+
+      - name: Every script named in the README exists
+        run: |
+          status=0
+          for f in $(grep -oE '\b[a-z0-9_.-]+\.(bat|sh|ps1)\b' README.md | sort -u); do
+            if [ ! -e "$f" ]; then
+              echo "FAIL README references missing file: $f"
+              status=1
+            fi
+          done
+          [ $status -eq 0 ] && echo "All referenced scripts exist"
+          exit $status
