@@ -14,7 +14,7 @@ code leaving your machine. Stock or abliterated, picked at launch.
 ![Model](https://img.shields.io/badge/model-Qwen3.8--27B-purple)
 
 ```bat
-qwen
+kiln
 ```
 
 One command on Windows. It prints what is installed, downloaded and
@@ -49,11 +49,11 @@ want *this* model running *well*:
 - **Settings derived from the architecture, not copied from a 7B guide.**
   Qwen3.8 is 75% linear attention, which changes what KV precision and
   context sizing should be. The reasoning is written down below.
-- **Context sized to your actual GPU.** `probe_hardware.ps1` reads your
+- **Context sized to your actual GPU.** `kiln` reads your
   VRAM and the weight files on disk and computes the window that fits,
   rather than assuming a card you may not own.
 - **A measurement path, not just claims.** `benchmark_qwen3.8.*` and
-  `measure_quant_quality.*` let you check every tuning decision here
+  `quality` let you check every tuning decision here
   against your own hardware and your own copies of the files.
 - **Remote access built in.** A Cloudflare tunnel plus a generated API
   key, so you can point Cursor at your desktop GPU from a laptop.
@@ -108,19 +108,21 @@ needed there.
 ### Windows
 
 ```bat
-qwen              :: status board and menu
-qwen status       :: just the board
-qwen setup        :: llama.cpp, cloudflared, models\
-qwen update       :: upgrade llama.cpp (needed for MTP)
-qwen get both     :: download the stock and abliterated weights
-qwen start        :: pick a build and serve it
-qwen stop         :: stop the server and the tunnel
-qwen key show     :: print the API key for Cursor
+git clone https://github.com/Lampsdad/Local-LLM-setup-for-Cursor-IDE
+cd Local-LLM-setup-for-Cursor-IDE
+kiln
 ```
 
-`qwen` with no argument prints a board like this:
+That is the whole install. `kiln` prints a status board, tells you the
+one thing to do next, and gives you a menu:
 
 ```
+  _     _  _        
+ | | __(_)| | _ __  
+ | |/ /| || || '_ \ 
+ |   < | || || | | |
+ |_|\_\|_||_||_| |_|  local models, fired on your own GPU
+
  ------------------------------------------------------------
   llama.cpp      installed  build 9431
   MTP support    available
@@ -133,62 +135,62 @@ qwen key show     :: print the API key for Cursor
   shared files   MTP head   vision
  ------------------------------------------------------------
   server         stopped
-  API key        xxxxxx...xxxx   qwen key show
+  API key        xxxxxx...xxxx   kiln key show
   tunnel         none
  ------------------------------------------------------------
 
- Next:  qwen start    serve a model to Cursor
+ Next:  kiln start    serve a model to Cursor
 ```
 
 The `Next:` line is the first unmet dependency, so following it
-repeatedly walks you from an empty checkout to a served model. Colour
-is automatic and honours `NO_COLOR`.
+repeatedly walks you from an empty checkout to a served model. Colour is
+automatic and honours `NO_COLOR`.
 
-`run.bat` still works and does the same job. Or drive the steps
-yourself:
-
-```bat
-install_windows.bat         :: one-time: llama.cpp, cloudflared, models\
-update_llama_bin.bat        :: get a build with MTP support (b9180+)
-launch.bat                  :: pick a build, download if needed, serve it
-```
-
-`launch.bat` is the model picker. It lists both builds with whatever is
-already on disk, fetches the one you choose if it is missing, and hands
-off to the tuned launcher. Skip the menu with `launch.bat base` or
-`launch.bat ablit`. The steps underneath it still work on their own:
+Every step is also a verb, if you would rather drive it yourself:
 
 ```bat
-download_qwen3.8_27b.bat ablit    :: or base; asks if you omit it
-start_qwen3.8_27b.bat ablit       :: or base; defaults to what is on disk
+kiln status       :: just the board
+kiln setup        :: llama.cpp, cloudflared, modelskiln update       :: upgrade llama.cpp (needed for MTP)
+kiln get both     :: download the stock and abliterated weights
+kiln start        :: pick a build and serve it
+kiln start ablit  :: skip the picker
+kiln stop         :: stop the server and the tunnel
+kiln key show     :: print the API key for Cursor
+kiln bench        :: quant speed and throughput sweep
+kiln clean        :: reclaim disk from superseded GGUFs
 ```
 
-### macOS
+### macOS and Linux
 
 ```bash
-./install_mac.sh
-./download_model.sh          # QUANT=UD-Q4_K_XL ./download_model.sh to override
-./start_mac.sh
+git clone https://github.com/Lampsdad/Local-LLM-setup-for-Cursor-IDE
+cd Local-LLM-setup-for-Cursor-IDE
+./kiln.sh
 ```
 
-There is no menu on the shell path — select the build with `VARIANT`:
+Same verbs, same order. `kiln.sh` detects macOS, Debian/Ubuntu or
+Fedora/RHEL and calls the right platform script for you:
 
 ```bash
-VARIANT=ablit ./download_model.sh
-VARIANT=ablit ./start_mac.sh      # or start_linux.sh / start_fedora.sh
+./kiln.sh setup           # llama.cpp, cloudflared, models/
+./kiln.sh get both        # download the stock and abliterated weights
+./kiln.sh start           # serve a model to Cursor
+./kiln.sh start ablit     # or the abliterated build
+./kiln.sh stop
+./kiln.sh key show
 ```
 
-### Linux
+Override the quant with an environment variable:
 
 ```bash
-./install_linux.sh           # or ./install_fedora.sh
-./download_model.sh
-./start_linux.sh             # or ./start_fedora.sh
+QUANT=UD-Q4_K_XL ./kiln.sh get
 ```
 
-All three shell paths support MTP, vision, both builds, and the
-generated API key, and size context with `--fit on`. `slurm-llama.sh` runs the same server
-as a Slurm batch job so the GPU shows as allocated in `squeue`.
+All platforms support MTP, vision, both builds and the generated API
+key. The shell path sizes context with llama.cpp's `--fit on` rather
+than the Windows probe, so no table lookup is needed there.
+`scripts/unix/slurm-llama.sh` runs the same server as a Slurm batch job
+so the GPU shows as allocated in `squeue`.
 
 ---
 
@@ -246,7 +248,7 @@ default.
 
 ## Choosing a build
 
-Two variants are wired up. `launch.bat` shows both, marks which are on
+Two variants are wired up. `kiln start` shows both, marks which are on
 disk, and downloads the one you pick.
 
 | | Stock | Abliterated |
@@ -255,7 +257,7 @@ disk, and downloads the one you pick.
 | Cursor model name | `qwen3.8-27b` | `qwen3.8-27b-abliterated` |
 | Refusal behaviour | as Qwen shipped it | ablated |
 | Weights on disk | ~20 GB | ~21 GB |
-| `launch.bat` argument | `base` | `ablit` |
+| `kiln start` argument | `base` | `ablit` |
 
 **They cost less together than apart.** huihui-ai's `UD-*` quants are
 re-ablations of the same unsloth GGUFs this repo already used, with the
@@ -266,7 +268,7 @@ is weights-only. It also means the quant names, the file sizes, and the
 context table above apply unchanged to both.
 
 **Only one runs at a time.** They share port 8080, and the start script
-stops any running server before starting the next, so `launch.bat` is a
+stops any running server before starting the next, so `kiln start` is a
 switch rather than a way to serve both at once. The distinct `--alias`
 values are what keep them apart in Cursor's model list — you will not
 silently be talking to the other one.
@@ -297,7 +299,7 @@ what the tuning numbers below were measured on.
 
 The KLD column is a **general pattern for 27B-class dense models, not a
 measurement of Qwen3.8**. To measure it on your own files, run
-`measure_quant_quality.bat` (or `.sh`) — it scores each quant you have
+`kiln quality` (`./kiln.sh quality` on Unix) — it scores each quant you have
 against Q8_0 by KL-divergence.
 
 Why KL-divergence rather than perplexity: for agentic coding the failure
@@ -373,12 +375,12 @@ read it. That lockdown is reapplied on every launch, so a key written
 before this existed gets fixed the next time you start the server.
 
 ```bat
-qwen key show           :: print it (also generates it the first time)
-qwen key rotate         :: throw it away and make a new one
-qwen key set MY-SECRET  :: use a passphrase you choose instead
+kiln key show           :: print it (also generates it the first time)
+kiln key rotate         :: throw it away and make a new one
+kiln key set MY-SECRET  :: use a passphrase you choose instead
 ```
 
-`qwen key set` accepts anything on one line — llama-server compares it
+`kiln key set` accepts anything on one line — llama-server compares it
 verbatim. Rotating or setting takes effect on the next server start, and
 you have to paste the new value into Cursor.
 
@@ -389,28 +391,54 @@ shared network, not just over the tunnel.
 
 ## Scripts
 
+You only ever type `kiln` (or `./kiln.sh`). Everything below sits in
+`scripts/` and is dispatched for you — this table is a map for people
+who want to read or change it.
+
+```
+kiln.bat / kiln.sh     the front door you type
+scripts/windows/       everything cmd.exe runs
+scripts/unix/          everything macOS and Linux run
+assets/banner.txt      the wordmark
+NOTES.md               why the tuned constants are what they are
+```
+
+**The CLI**
+
 | Script | Purpose |
 |---|---|
-| `qwen.bat` | The CLI. Status board, menu, and a verb for every step. Delegates to the scripts below. |
-| `run.bat` | Older Windows entry point. Detects your state and runs the right step. |
-| `launch.bat` | Model picker: stock or abliterated, downloading first if needed. Takes `base` / `ablit` to skip the menu. |
-| `install_windows.bat` | One-time setup: llama.cpp binaries, cloudflared, `models/`. Pinned to the CUDA 13.3 x64 asset. |
-| `install_mac.sh` / `install_linux.sh` / `install_fedora.sh` | Same, per platform. |
-| `update_llama_bin.bat` | Upgrade llama.cpp to the latest release, backing up the old build. Verifies MTP support afterward. |
-| `download_qwen3.8_27b.bat` / `download_model.sh` | Weights + MTP head + vision projector, for one build. Resumable. |
-| `start_qwen3.8_27b.bat` | Tuned Windows launcher. Auto-detects build, quant, MTP, vision, VRAM, and cores. |
-| `lib_variants.bat` / `.sh` | Definition of each build — repo, filename prefix, Cursor alias. Add a third variant here. |
-| `lib_api_key.bat` / `lib_api_key.sh` | Generates the API key, locks the file to your account, hands back `API_KEY`. |
-| `lib_ui.bat` | ANSI palette for the CLI. Degrades to empty strings under `NO_COLOR`. |
-| `start_mac.sh` / `start_linux.sh` / `start_fedora.sh` | Same, per platform, using `--fit on`. |
-| `slurm-llama.sh` | Run the server as a Slurm job so the GPU shows as allocated. |
-| `probe_hardware.ps1` | Reads VRAM/cores and computes the context window that fits. |
-| `benchmark_qwen3.8.bat` / `.sh` | Quant speed, ubatch sweep, KV precision, throughput vs depth. |
-| `measure_quant_quality.bat` / `.sh` | KL-divergence of each quant against Q8_0. |
-| `cleanup_disk.bat` / `.sh` | Reclaim space from superseded GGUFs. Requires typing `DELETE`. |
+| `kiln.bat` | Windows front door. A shim onto `scripts/windows/kiln.bat`. |
+| `kiln.sh` | macOS/Linux front door. Detects the platform and dispatches to `scripts/unix/`. |
+| `scripts/windows/kiln.bat` | The real CLI: status board, menu, and a verb for every step. |
 
-`start_windows.bat` and `download_model.bat` forward to the Qwen3.8
-scripts.
+**Windows** (`scripts/windows/`)
+
+| Script | Purpose |
+|---|---|
+| `install.bat` | One-time setup: llama.cpp binaries, cloudflared, `models/`. Pinned to the CUDA 13.3 x64 asset. |
+| `update.bat` | Upgrade llama.cpp to the latest release, backing up the old build. Verifies MTP support afterward. |
+| `download.bat` | Weights + MTP head + vision projector, for one build. Resumable. |
+| `launch.bat` | Model picker: stock or abliterated, downloading first if needed. Takes `base` / `ablit` to skip the menu. |
+| `start.bat` | Tuned launcher. Auto-detects build, quant, MTP, vision, VRAM and cores. |
+| `probe_hardware.ps1` | Reads VRAM/cores and computes the context window that fits. |
+| `benchmark.bat` | Quant speed, ubatch sweep, KV precision, throughput vs depth. |
+| `quality.bat` | KL-divergence of each quant against Q8_0. |
+| `cleanup.bat` | Reclaim space from superseded GGUFs. Requires typing `DELETE`. |
+| `lib_variants.bat` | Definition of each build — repo, filename prefix, Cursor alias. Add a third variant here. |
+| `lib_api_key.bat` | Generates the API key, locks the file to your account, hands back `API_KEY`. |
+| `lib_ui.bat` | ANSI palette for the CLI. Degrades to empty strings under `NO_COLOR`. |
+
+**macOS and Linux** (`scripts/unix/`)
+
+| Script | Purpose |
+|---|---|
+| `install_mac.sh` / `install_linux.sh` / `install_fedora.sh` | One-time setup, per platform. |
+| `download.sh` | Weights + MTP head + vision projector. `QUANT=` and `VARIANT=` override. |
+| `start_mac.sh` / `start_linux.sh` / `start_fedora.sh` | Tuned launchers, sizing context with `--fit on`. |
+| `slurm-llama.sh` | Run the server as a Slurm job so the GPU shows as allocated. |
+| `start-cloudflared-once.sh` | Bring up the tunnel on its own. |
+| `benchmark.sh` / `quality.sh` / `cleanup.sh` | Shell twins of the Windows tools. |
+| `lib_variants.sh` / `lib_api_key.sh` | Shell twins of the Windows libraries. |
 
 ---
 
@@ -440,7 +468,7 @@ or override.
 
 **Model loads but generation is slow.** Check that MTP actually engaged —
 `server.log` should mention the draft model. If `--spec-type draft-mtp`
-was rejected, your llama.cpp predates b9180; run `update_llama_bin.bat`.
+was rejected, your llama.cpp predates b9180; run `kiln update`.
 
 **Out of memory at load.** The launcher sizes context to your card, but
 its estimate is not exact. Drop to the next quant down, or delete the MTP
@@ -500,7 +528,7 @@ Cursor-specific setup steps differ.
 
 **How fast is it?** That depends on your card, quant and draft acceptance
 rate, so this repo ships a measurement path rather than a number:
-`benchmark_qwen3.8.bat` (or `.sh`). MTP speculative decoding is the single
+`kiln bench` (`./kiln.sh bench` on Unix). MTP speculative decoding is the single
 largest lever — confirm it engaged before comparing anything.
 
 **Why Qwen3.8-27B and not a bigger model?** 27B at `UD-Q5_K_XL` is the

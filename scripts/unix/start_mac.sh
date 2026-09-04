@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "$0")"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR/../.."
 
 # VARIANT=base (stock) or VARIANT=ablit (abliterated).
 # Both share the MTP head and the vision projector below.
-. ./lib_variants.sh
+. "$SCRIPT_DIR/lib_variants.sh"
 
 QUANT="${QUANT:-UD-Q5_K_XL}"
 MODEL="./models/${V_PREFIX}-${QUANT}.gguf"
@@ -21,12 +22,12 @@ if [ ! -f "$BINARY" ]; then
     exit 1
 fi
 if [ ! -f "$MODEL" ]; then
-    echo "ERROR: $MODEL not found. Run VARIANT=${V_ID} ./download_model.sh first."
+    echo "ERROR: $MODEL not found. Run: VARIANT=${V_ID} ./kiln.sh get"
     exit 1
 fi
 
 # ── API key (the tunnel URL is public — see lib_api_key.sh) ──
-. ./lib_api_key.sh
+. "$SCRIPT_DIR/lib_api_key.sh"
 
 # ── stop any running instances ───────────────────────────────
 echo "Stopping any existing instances..."

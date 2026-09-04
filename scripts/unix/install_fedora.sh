@@ -6,7 +6,7 @@
 #   NVIDIA users: the proprietary driver already exposes Vulkan; the mesa package
 #   adds the open-source loader and is optional but recommended for diagnostics.
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/../.."
 
 echo "============================================================"
 echo " Local Model Runtime - Fedora Install (Vulkan)"
@@ -113,6 +113,6 @@ echo "[OK] models/ directory ready."
 echo
 echo "============================================================"
 echo " Setup complete! Next steps:"
-echo "   1. bash download_model.sh    -- downloads the ~30 GB model"
-echo "   2. bash start_fedora.sh      -- launches server + tunnel"
+echo "   1. ./kiln.sh get     -- downloads the ~30 GB model"
+echo "   2. ./kiln.sh start   -- launches server + tunnel"
 echo "============================================================"

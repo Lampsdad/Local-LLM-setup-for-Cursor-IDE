@@ -1,6 +1,6 @@
 @echo off
 setlocal enabledelayedexpansion
-cd /d "%~dp0"
+cd /d "%~dp0..\.."
 call "%~dp0lib_ui.bat"
 
 :: ============================================================
@@ -76,12 +76,12 @@ call :pick "UD-IQ3_XXS" 262144
 
 if not defined MODEL (
     echo  ERROR: no %V_LABEL% weights found in models\
-    echo  Run: download_qwen3.8_27b.bat %V_ID%
+    echo  Run: kiln get %V_ID%
     pause & exit /b 1
 )
 
 if not exist "%BINARY%" (
-    echo  ERROR: %BINARY% not found. Run install_windows.bat or update_llama_bin.bat.
+    echo  ERROR: %BINARY% not found. Run: kiln setup  ^(or kiln update^)
     pause & exit /b 1
 )
 
@@ -92,7 +92,7 @@ if not errorlevel 1 (
     if exist "%MTP%" set USE_MTP=1
 ) else (
     echo  [WARN] this llama.cpp build predates MTP support ^(merged b9180^).
-    echo         Run update_llama_bin.bat to get the ~1.5-2x speedup.
+    echo         Run: kiln update  for the ~1.5-2x speedup.
 )
 
 :: ---- vision ----
@@ -112,7 +112,7 @@ set PROBED=0
 set VRAM_MIB=0
 set CORES=0
 set CTX=0
-for /f "usebackq tokens=1,2 delims==" %%A in (`powershell -NoProfile -ExecutionPolicy Bypass -File "probe_hardware.ps1" -Model "%MODEL%" -Mtp "%PROBE_MTP%" -Mmproj "%PROBE_MMPROJ%" 2^>nul`) do set "%%A=%%B"
+for /f "usebackq tokens=1,2 delims==" %%A in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0probe_hardware.ps1" -Model "%MODEL%" -Mtp "%PROBE_MTP%" -Mmproj "%PROBE_MMPROJ%" 2^>nul`) do set "%%A=%%B"
 
 if "%CORES%"=="0" set CORES=8
 

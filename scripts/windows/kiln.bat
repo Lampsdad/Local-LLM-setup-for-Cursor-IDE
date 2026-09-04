@@ -1,20 +1,20 @@
 @echo off
 setlocal enabledelayedexpansion
-cd /d "%~dp0"
+cd /d "%~dp0..\.."
 call "%~dp0lib_ui.bat"
 
 :: ============================================================
-::  qwen -- one front door for this repo.
+::  kiln -- one front door for this repo.
 ::
-::    qwen                 status board, then a menu
-::    qwen status          status board only
-::    qwen setup           llama.cpp + cloudflared + models\
-::    qwen get [base|ablit|both]
-::    qwen start [base|ablit]
-::    qwen stop            stop server and tunnel
-::    qwen key [show|rotate|set <key>]
-::    qwen update          upgrade llama.cpp
-::    qwen bench | clean | help
+::    kiln                 status board, then a menu
+::    kiln status          status board only
+::    kiln setup           llama.cpp + cloudflared + models\
+::    kiln get [base|ablit|both]
+::    kiln start [base|ablit]
+::    kiln stop            stop server and tunnel
+::    kiln key [show|rotate|set <key>]
+::    kiln update          upgrade llama.cpp
+::    kiln bench | clean | help
 ::
 ::  Everything here delegates to the existing scripts, and none
 ::  of them changed to accommodate it -- any of them can still be
@@ -68,7 +68,7 @@ goto :menu
 :banner
 echo.
 if defined ESC <nul set /p "=%C_AC%%C_B%"
-type "%~dp0banner.txt"
+type "%~dp0..\..\assets\banner.txt"
 if defined ESC <nul set /p "=%C_0%"
 echo.
 exit /b 0
@@ -180,7 +180,7 @@ set "ST_KEY_S=%C_MU%not generated yet%C_0%"
 if exist "api_key.txt" (
     set "K="
     set /p K=<api_key.txt
-    set "ST_KEY_S=%C_HL%!K:~0,6!%C_0%%C_MU%...!K:~-4!   qwen key show%C_0%"
+    set "ST_KEY_S=%C_HL%!K:~0,6!%C_0%%C_MU%...!K:~-4!   kiln key show%C_0%"
 )
 
 :: ---- tunnel: only meaningful while a server is up ----
@@ -192,14 +192,14 @@ if "%ST_RUN%"=="1" if exist "%CF_LOG%" (
 :: ---- the one thing to do next ----
 :: Ordered by dependency, first match wins, so the hint is always
 :: the step that unblocks the rest.
-if "%ST_BIN%"=="0" set "ST_NEXT=%C_AC%qwen setup%C_0%    install llama.cpp and cloudflared"
-if not defined ST_NEXT if "%ST_MTP%"=="0" set "ST_NEXT=%C_AC%qwen update%C_0%   upgrade llama.cpp for MTP speculative decoding"
-if not defined ST_NEXT if not defined Q_BASE if not defined Q_ABL set "ST_NEXT=%C_AC%qwen get both%C_0% download the weights"
-if not defined ST_NEXT if "%ST_RUN%"=="0" set "ST_NEXT=%C_AC%qwen start%C_0%    serve a model to Cursor"
+if "%ST_BIN%"=="0" set "ST_NEXT=%C_AC%kiln setup%C_0%    install llama.cpp and cloudflared"
+if not defined ST_NEXT if "%ST_MTP%"=="0" set "ST_NEXT=%C_AC%kiln update%C_0%   upgrade llama.cpp for MTP speculative decoding"
+if not defined ST_NEXT if not defined Q_BASE if not defined Q_ABL set "ST_NEXT=%C_AC%kiln get both%C_0% download the weights"
+if not defined ST_NEXT if "%ST_RUN%"=="0" set "ST_NEXT=%C_AC%kiln start%C_0%    serve a model to Cursor"
 exit /b 0
 
 :: :probe <filename prefix> <out var>
-:: Best quant present, in the same order start_qwen3.8_27b.bat
+:: Best quant present, in the same order start.bat
 :: picks, so the board names the file that would actually load.
 :probe
 set "%~2="
@@ -213,11 +213,11 @@ exit /b 0
 ::  menu (no-argument mode)
 :: ============================================================
 :menu
-echo   %C_HL%1%C_0%  start a model       %C_MU%qwen start%C_0%
-echo   %C_HL%2%C_0%  download a model    %C_MU%qwen get%C_0%
-echo   %C_HL%3%C_0%  stop the server     %C_MU%qwen stop%C_0%
-echo   %C_HL%4%C_0%  show the API key    %C_MU%qwen key show%C_0%
-echo   %C_HL%5%C_0%  install or update   %C_MU%qwen setup, qwen update%C_0%
+echo   %C_HL%1%C_0%  start a model       %C_MU%kiln start%C_0%
+echo   %C_HL%2%C_0%  download a model    %C_MU%kiln get%C_0%
+echo   %C_HL%3%C_0%  stop the server     %C_MU%kiln stop%C_0%
+echo   %C_HL%4%C_0%  show the API key    %C_MU%kiln key show%C_0%
+echo   %C_HL%5%C_0%  install or update   %C_MU%kiln setup, kiln update%C_0%
 echo   %C_HL%Q%C_0%  quit
 echo.
 set "SEL="
@@ -243,21 +243,21 @@ goto :cmd_key
 :: ============================================================
 :cmd_setup
 call :step "Installing llama.cpp, cloudflared and models\"
-call "%~dp0install_windows.bat"
+call "%~dp0install.bat"
 exit /b %errorlevel%
 
 :cmd_update
 call :step "Upgrading llama.cpp"
-call "%~dp0update_llama_bin.bat"
+call "%~dp0update.bat"
 exit /b %errorlevel%
 
 :cmd_get
 if /I "%ARG%"=="both" goto :get_both
 if defined ARG (
-    call "%~dp0download_qwen3.8_27b.bat" "%ARG%"
+    call "%~dp0download.bat" "%ARG%"
     exit /b %errorlevel%
 )
-call "%~dp0download_qwen3.8_27b.bat"
+call "%~dp0download.bat"
 exit /b %errorlevel%
 
 :get_both
@@ -266,15 +266,15 @@ exit /b %errorlevel%
 :: present and skips. The other order costs the same but reads as
 :: if the second download were mysteriously smaller.
 call :step "1 of 2   Qwen3.8-27B -- weights, MTP head, vision projector"
-call "%~dp0download_qwen3.8_27b.bat" base
+call "%~dp0download.bat" base
 if errorlevel 1 exit /b 1
 call :step "2 of 2   Qwen3.8-27B abliterated -- weights only"
-call "%~dp0download_qwen3.8_27b.bat" ablit
+call "%~dp0download.bat" ablit
 exit /b %errorlevel%
 
 :cmd_start
 if defined ARG (
-    call "%~dp0start_qwen3.8_27b.bat" "%ARG%"
+    call "%~dp0start.bat" "%ARG%"
     exit /b %errorlevel%
 )
 call "%~dp0launch.bat"
@@ -322,7 +322,7 @@ exit /b 0
 
 :key_set
 if not defined ARG2 (
-    echo  %C_ERR%Usage:%C_0% qwen key set YOUR-KEY
+    echo  %C_ERR%Usage:%C_0% kiln key set YOUR-KEY
     exit /b 1
 )
 :: Your own passphrase instead of the generated one. llama-server
@@ -336,11 +336,11 @@ echo.
 exit /b 0
 
 :cmd_bench
-call "%~dp0benchmark_qwen3.8.bat"
+call "%~dp0benchmark.bat"
 exit /b %errorlevel%
 
 :cmd_clean
-call "%~dp0cleanup_disk.bat"
+call "%~dp0cleanup.bat"
 exit /b %errorlevel%
 
 :step
@@ -351,7 +351,7 @@ exit /b 0
 
 :cmd_help
 call :banner
-echo  %C_HL%Usage:%C_0%  qwen COMMAND [ARGUMENT]
+echo  %C_HL%Usage:%C_0%  kiln COMMAND [ARGUMENT]
 echo.
 echo   %C_AC%status%C_0%                  what is installed, downloaded and running
 echo   %C_AC%setup%C_0%                   one-time: llama.cpp, cloudflared, models\
@@ -363,7 +363,7 @@ echo   %C_AC%key%C_0%   [show^|rotate^|set] manage the API key
 echo   %C_AC%bench%C_0%                   quant speed and throughput sweep
 echo   %C_AC%clean%C_0%                   reclaim disk from superseded GGUFs
 echo.
-echo  %C_MU%With no command, qwen prints the status board and a menu.%C_0%
+echo  %C_MU%With no command, kiln prints the status board and a menu.%C_0%
 echo  %C_MU%Set NO_COLOR=1 to disable colour.%C_0%
 echo.
 exit /b 0

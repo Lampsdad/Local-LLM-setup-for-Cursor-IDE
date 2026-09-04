@@ -16,8 +16,8 @@ The defaults in this repo were developed and validated on:
 | Disk | single ~1.86 TB volume |
 | OS | Windows 11 Home |
 
-`start_qwen3.8_27b.bat` no longer hardcodes any of this — it reads VRAM
-and physical core count via `probe_hardware.ps1` at launch. The numbers
+`scripts/windows/start.bat` no longer hardcodes any of this — it reads
+VRAM and physical core count via `probe_hardware.ps1` at launch. The numbers
 above are what the hand-validated 131K context figure was measured
 against.
 
@@ -46,7 +46,8 @@ if you change one, re-check that case.
 
 ## Model variants
 
-`lib_variants.bat` / `lib_variants.sh` are the only files that know what a
+`lib_variants.bat` / `lib_variants.sh` (in `scripts/windows/` and
+`scripts/unix/`) are the only files that know what a
 build *is*. A third variant means adding a branch there — the download,
 start and launch scripts read repo, filename prefix and Cursor alias out
 of it and are otherwise variant-blind.
@@ -75,7 +76,7 @@ leaves 0–17 untouched, which is what keeps coding and tool-calling near
 stock. They also publish a `UD-DW-*` series ablating only 23–51 (less
 thorough, warns more); it is not wired up here.
 
-**The size columns** in `download_qwen3.8_27b.bat` are the actual byte
+**The size columns** in `scripts/windows/download.bat` are the actual byte
 sizes from the Hugging Face file listings on 2026-09-01, and only feed the
 free-space check. The stock column was previously off by up to 1 GB in
 both directions; re-check both if either publisher reuploads.
@@ -88,8 +89,8 @@ scripts; the scanner for the first one is worth re-running after edits.
 - **Unescaped parentheses in an `echo` inside a `( )` block.** The `)` in
   `echo ... (merged b9180).` closed the block early and cmd printed
   `. was unexpected at this time.` on every launch on a pre-b9180 build.
-  Hit `start_qwen3.8_27b.bat`, `install_windows.bat` and
-  `cleanup_disk.bat`. Escape as `^(` / `^)`.
+  Hit `start.bat`, `install.bat` and `cleanup.bat`. Escape as
+  `^(` / `^)`.
 - **`::` comments inside a `( )` block.** Labels are not valid there;
   use `rem`.
 - **`for /f` splits backquoted commands on commas.** `nvidia-smi
@@ -102,7 +103,7 @@ scripts; the scanner for the first one is worth re-running after edits.
 - **`timeout /t` refuses to run when stdin is redirected**, returning
   instantly with `ERROR: Input redirection is not supported`. Any wait
   loop built on it spins when the script is driven from another script or
-  a pipe. `:sleep` in `start_qwen3.8_27b.bat` falls back to `ping`.
+  a pipe. `:sleep` in `start.bat` falls back to `ping`.
 - **Bare `call foo.bat` depends on cmd searching the current directory**,
   which `NoDefaultCurrentDirectoryInExePath=1` disables. Use
   `call "%~dp0foo.bat"`.
@@ -115,14 +116,14 @@ This machine runs a single ~1.86 TB volume, so it fills up. Two things
 worth knowing:
 
 - `~/.cache/huggingface` holds ~180 GB from *other* research projects.
-  `cleanup_disk.bat` deliberately does not touch it.
+  `cleanup.bat` deliberately does not touch it.
 - The KL-divergence reference logits (`models/kld-base-qwen3.8.dat`)
   produced by `measure_quant_quality` are large. Delete them once you
   have settled on a quant.
 
 ## Slurm
 
-`slurm-llama.sh` hardcodes `${HOME}/research/Local-LLM-setup-for-cursor`
+`scripts/unix/slurm-llama.sh` hardcodes `${HOME}/research/Local-LLM-setup-for-cursor`
 as its working directory and requests `--gres=gpu:rtx5090:1` on the
 `debug` partition. Both are site-specific; edit them for your cluster.
 

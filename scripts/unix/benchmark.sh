@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/../.."
 
 # ============================================================
 #  Benchmark Qwen3.8-27B on this machine.
@@ -44,7 +44,7 @@ do
 done
 
 if [ -z "$MODEL" ]; then
-    echo "ERROR: no Qwen3.8-27B weights found. Run ./download_model.sh."
+    echo "ERROR: no Qwen3.8-27B weights found. Run: ./kiln.sh get"
     exit 1
 fi
 
@@ -96,7 +96,7 @@ echo >> "$RESULTS"
 echo "[C/4] KV cache precision..."
 {
     echo "--- C. KV PRECISION (speed cost of f16 vs q8_0 vs q4_0) ---"
-    echo "  Quality is measured separately by ./measure_quant_quality.sh."
+    echo "  Quality is measured separately by scripts/unix/quality.sh."
 } >> "$RESULTS"
 for k in f16 q8_0 q4_0; do
     echo "  - KV $k"

@@ -22,7 +22,7 @@ Several constants here are load-bearing and were derived from the
 architecture rather than guessed:
 
 - the `0.85` allocation-slack factor and `34,816` bytes/token in
-  `probe_hardware.ps1`
+  `scripts/windows/probe_hardware.ps1`
 - `q8_0` KV cache precision (**not** `q4_0` — see the recurrent-layer note
   in the README)
 - `--parallel 1`, and the 4096/1024 batch sizes
@@ -32,11 +32,45 @@ If you change one, say what you measured. `benchmark_qwen3.8.*` and
 argued about. A PR that changes a number with a reason beats one that
 changes it with a preference.
 
+## Layout, and the one rule that matters
+
+```
+kiln.bat / kiln.sh     the front door
+scripts/windows/       everything cmd.exe runs
+scripts/unix/          everything macOS and Linux run
+assets/                the wordmark
+```
+
+**Every script sets its working directory to the repo root, not to its
+own directory.** `models/`, `llama-bin/`, `api_key.txt` and `server.log`
+all live at the root and are referenced relatively, so a script that
+skips this resolves them into `scripts/windows/` and silently does the
+wrong thing.
+
+```bat
+cd /d "%~dp0..\.."
+```
+
+```bash
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR/../.."
+```
+
+Because the working directory is the repo root, a shell script must
+source its libraries through `$SCRIPT_DIR`, not `./`:
+
+```bash
+. "$SCRIPT_DIR/lib_variants.sh"
+```
+
+Batch files call siblings with `%~dp0`, which is already relative to the
+calling script, so those need no adjustment.
+
 ## Shell and batch conventions
 
 Both script families are maintained in parallel — a change to
-`start_linux.sh` usually needs the matching change in
-`start_qwen3.8_27b.bat`.
+`scripts/unix/start_linux.sh` usually needs the matching change in
+`scripts/windows/start.bat`.
 
 - **Line endings are enforced by CI.** `.sh` must be LF, `.bat` and `.ps1`
   must be CRLF. `.gitattributes` pins this regardless of your
@@ -52,7 +86,8 @@ Both script families are maintained in parallel — a change to
 
 ## Adding a model variant
 
-`lib_variants.bat` / `lib_variants.sh` are the only files that know what a
+`scripts/windows/lib_variants.bat` and `scripts/unix/lib_variants.sh` are
+the only files that know what a
 build *is*. Everything else reads repo, filename prefix and Cursor alias
 out of them and is otherwise variant-blind. A third variant should be a
 branch there and nowhere else.
@@ -65,8 +100,8 @@ and CI fails if any get tracked anyway.
 ## Running the checks locally
 
 ```bash
-bash -n *.sh
-shellcheck --severity=error *.sh
+bash -n $(git ls-files '*.sh')
+shellcheck --severity=error $(git ls-files '*.sh')
 ```
 
 Open an issue before a large change so you do not build something that

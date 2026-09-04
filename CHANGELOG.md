@@ -7,28 +7,33 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [1.0.0] — 2026-09-03
 
 First tagged release. The repo has been usable for months; this marks the
-point where the Qwen3.8 path, the API key, and the `qwen` CLI are all in
+point where the Qwen3.8 path, the API key, and the `kiln` CLI are all in
 place across every platform.
 
 ### Added
 
-- **`qwen.bat`, a single Windows entry point.** Prints a status board of
-  what is installed, downloaded and running, names the one thing to do
-  next, and offers a menu. Verbs for every step: `status`, `setup`,
-  `update`, `get`, `start`, `stop`, `key`.
+- **`kiln`, a single entry point on every platform.** Prints a status
+  board of what is installed, downloaded and running, names the one thing
+  to do next, and offers a menu. Verbs for every step: `status`, `setup`,
+  `update`, `get`, `start`, `stop`, `key`, `bench`, `clean`. `kiln.bat` on
+  Windows, `./kiln.sh` on macOS and Linux — the latter detects your
+  distribution and dispatches to the right platform script.
+- **A `scripts/` layout.** The repo root was 36 loose files; it is now the
+  entry point plus documentation, with `scripts/windows/` and
+  `scripts/unix/` holding the rest.
 - **Shared libraries** — `lib_variants`, `lib_api_key`, `lib_ui` — so the
   Windows and shell script families no longer duplicate variant
   definitions or key handling.
 - **Abliterated build** alongside the stock one, selectable at launch with
-  `launch.bat ablit` or `VARIANT=ablit`. Both builds share one copy of the
+  `kiln start ablit` or `VARIANT=ablit`. Both builds share one copy of the
   MTP head and vision projector, so the second download is weights-only.
-- **`slurm-llama.sh`**, to run the server as a Slurm batch job so the GPU
+- **`scripts/unix/slurm-llama.sh`**, to run the server as a Slurm batch job so the GPU
   shows as allocated in `squeue`.
-- **`measure_quant_quality.*`**, scoring each quant against `Q8_0` by
+- **`kiln quality`**, scoring each quant against `Q8_0` by
   KL-divergence rather than perplexity.
-- **`benchmark_qwen3.8.*`** — quant speed, ubatch sweep, KV precision and
+- **`kiln bench`** — quant speed, ubatch sweep, KV precision and
   throughput vs. context depth.
-- **`cleanup_disk.*`**, to reclaim space from superseded GGUFs. Requires
+- **`kiln clean`**, to reclaim space from superseded GGUFs. Requires
   typing `DELETE`.
 
 ### Changed
@@ -49,6 +54,13 @@ place across every platform.
 - **`--parallel 1`** rather than llama.cpp's auto default, which splits
   the KV cache across slots and hands a single-user Cursor session only
   `ctx/N` of its own context window.
+
+### Removed
+
+- **Legacy Windows forwarders** `run.bat`, `start_windows.bat` and
+  `download_model.bat`. Use `kiln` instead.
+- The `qwen` command is now `kiln`. It collided with Alibaba's official
+  Qwen Code CLI and tied the tool to a single model family.
 
 ### Security
 

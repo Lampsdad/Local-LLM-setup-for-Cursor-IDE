@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Before filing: run `qwen status` (Windows) and paste the board
+        Before filing: run `kiln status` (Windows) and paste the board
         below. It answers most of the questions here on its own.
 
   - type: textarea
@@ -14,7 +14,7 @@ body:
       label: What happened
       description: What you ran, what you expected, what you got instead.
       placeholder: |
-        I ran `qwen start` and the server exited with ...
+        I ran `kiln start` and the server exited with ...
     validations:
       required: true
 
@@ -69,7 +69,7 @@ body:
   - type: textarea
     id: status
     attributes:
-      label: Output of `qwen status`
+      label: Output of `kiln status`
       description: Windows only. Skip on macOS/Linux.
       render: text
 

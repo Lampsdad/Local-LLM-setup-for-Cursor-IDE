@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/../.."
 
 ARCH=$(uname -m)   # arm64 = Apple Silicon, x86_64 = Intel
 
@@ -77,8 +77,8 @@ echo "[OK] models/ directory ready."
 echo
 echo "============================================================"
 echo " Setup complete! Next steps:"
-echo "   1. bash download_model.sh   -- downloads the ~30 GB model"
-echo "   2. bash start_mac.sh        -- launches server + tunnel"
+echo "   1. ./kiln.sh get     -- downloads the ~30 GB model"
+echo "   2. ./kiln.sh start   -- launches server + tunnel"
 echo "============================================================"
 if [ "$ARCH" = "arm64" ]; then
     echo

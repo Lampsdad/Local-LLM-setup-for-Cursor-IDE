@@ -1,11 +1,11 @@
 @echo off
 setlocal enabledelayedexpansion
-cd /d "%~dp0"
+cd /d "%~dp0..\.."
 
 :: ============================================================
 ::  Benchmark Qwen3.8-27B on this machine.
 ::
-::  The tuned values in start_qwen3.8_27b.bat (-b 4096 -ub 1024,
+::  The tuned values in start.bat (-b 4096 -ub 1024,
 ::  q8_0 KV) are reasoned from the architecture, not measured.
 ::  This script measures them so you can confirm or override.
 ::
@@ -24,7 +24,7 @@ set BENCH=llama-bin\llama-bench.exe
 set RESULTS=benchmark_results.txt
 
 if not exist "%BENCH%" (
-    echo ERROR: %BENCH% not found. Run update_llama_bin.bat.
+    echo ERROR: %BENCH% not found. Run: kiln update
     pause & exit /b 1
 )
 
@@ -43,7 +43,7 @@ for %%F in (
     if not defined MODEL if exist %%F set "MODEL=%%~F"
 )
 if not defined MODEL (
-    echo ERROR: no Qwen3.8-27B weights found. Run download_qwen3.8_27b.bat.
+    echo ERROR: no Qwen3.8-27B weights found. Run: kiln get
     pause & exit /b 1
 )
 
@@ -84,7 +84,7 @@ echo. >> "%RESULTS%"
 :: ============================================================
 echo [C/4] KV cache precision...
 echo --- C. KV PRECISION (speed cost of f16 vs q8_0 vs q4_0) --- >> "%RESULTS%"
-echo   Quality is measured separately by measure_quant_quality.bat. >> "%RESULTS%"
+echo   Quality is measured separately by scripts\windows\quality.bat. >> "%RESULTS%"
 for %%K in (f16 q8_0 q4_0) do (
     echo   - KV %%K
     echo   [KV=%%K] >> "%RESULTS%"
@@ -106,7 +106,7 @@ echo  READING THESE RESULTS >> "%RESULTS%"
 echo   pp = prefill tok/s   tg = generation tok/s >> "%RESULTS%"
 echo. >> "%RESULTS%"
 echo  Section B: if pp keeps climbing through ub=2048, raise >> "%RESULTS%"
-echo   --ubatch-size in start_qwen3.8_27b.bat. If it plateaus or >> "%RESULTS%"
+echo   --ubatch-size in scripts\windows\start.bat. If it plateaus or >> "%RESULTS%"
 echo   OOMs at 2048, keep 1024. >> "%RESULTS%"
 echo. >> "%RESULTS%"
 echo  Section C: q8_0 normally costs only a few percent vs f16 >> "%RESULTS%"
@@ -115,7 +115,7 @@ echo   to f16 and lower --ctx-size instead. >> "%RESULTS%"
 echo. >> "%RESULTS%"
 echo  MTP speedup is NOT measured here -- llama-bench has no >> "%RESULTS%"
 echo   speculative-decoding path. Measure it live: >> "%RESULTS%"
-echo     1. start_qwen3.8_27b.bat, note tg in server.log >> "%RESULTS%"
+echo     1. kiln start, note tg in server.log >> "%RESULTS%"
 echo     2. comment out the --spec-type block, restart, compare >> "%RESULTS%"
 echo ============================================================ >> "%RESULTS%"
 

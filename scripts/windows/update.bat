@@ -1,6 +1,6 @@
 @echo off
 setlocal enabledelayedexpansion
-cd /d "%~dp0"
+cd /d "%~dp0..\.."
 
 :: ============================================================
 ::  Update llama.cpp binaries to the latest GitHub release.

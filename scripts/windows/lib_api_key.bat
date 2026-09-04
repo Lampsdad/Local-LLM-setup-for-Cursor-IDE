@@ -16,7 +16,7 @@
 ::  Deliberately no setlocal: the caller wants these back.
 :: ============================================================
 
-set "API_KEY_FILE=%~dp0api_key.txt"
+set "API_KEY_FILE=%~dp0..\..\api_key.txt"
 
 if exist "%API_KEY_FILE%" goto :have_key
 

@@ -16,7 +16,7 @@ cd "${HOME}/research/Local-LLM-setup-for-cursor"
 
 PORT=8081
 # VARIANT=base (stock) or VARIANT=ablit (abliterated).
-. ./lib_variants.sh
+. ./scripts/unix/lib_variants.sh
 
 QUANT="${QUANT:-UD-Q5_K_XL}"
 MODEL="./models/${V_PREFIX}-${QUANT}.gguf"
@@ -30,10 +30,10 @@ pkill -x cloudflared 2>/dev/null || true
 
 # This binds 0.0.0.0 on a shared cluster node, so the key is not
 # optional here — anyone who can reach the node can reach the API.
-. ./lib_api_key.sh
+. ./scripts/unix/lib_api_key.sh
 
 # This job requests a single RTX 5090 (32 GB), so the sizing below
-# matches start_qwen3.8_27b.bat: UD-Q5_K_XL weights + MTP head +
+# matches scripts/windows/start.bat: UD-Q5_K_XL weights + MTP head +
 # vision leave room for 131K of q8_0 KV.
 EXTRA=()
 if [ -f "$MTP" ] && "$BINARY" --help 2>&1 | grep -q 'draft-mtp'; then

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/../.."
 
 # ============================================================
 #  Measure the real quality cost of each Qwen3.8-27B quant on
@@ -45,7 +45,7 @@ if [ ! -f "$REF" ]; then
  KL-divergence needs a near-lossless baseline to compare
  against. Download Q8_0 (29 GB) with:
 
-   QUANT=Q8_0 ./download_model.sh
+   QUANT=Q8_0 ./kiln.sh get
 
  then re-run this script.
 ============================================================

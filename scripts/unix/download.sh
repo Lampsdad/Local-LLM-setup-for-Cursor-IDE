@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "$0")"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR/../.."
 
 # ============================================================
 #  Download Qwen3.8-27B (released 2026-08-05).
@@ -16,11 +17,11 @@ cd "$(dirname "$0")"
 #  untouched.
 #
 #  Override with QUANT=... and VARIANT=..., e.g.
-#    QUANT=UD-Q4_K_XL ./download_model.sh
-#    VARIANT=ablit ./download_model.sh
+#    QUANT=UD-Q4_K_XL ./kiln.sh get
+#    VARIANT=ablit ./kiln.sh get
 # ============================================================
 
-. ./lib_variants.sh
+. "$SCRIPT_DIR/lib_variants.sh"
 
 BASE_REPO="$V_REPO"
 MTP_REPO="ggml-org/Qwen3.8-27B-GGUF"

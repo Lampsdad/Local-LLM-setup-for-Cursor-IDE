@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/../.."
 
 # ============================================================
 #  Free disk space before downloading Qwen3.8-27B.
@@ -101,5 +101,5 @@ echo
 echo "============================================================"
 echo " Free space here: $(free_gb) GB  (was ${FREE_BEFORE} GB)"
 echo
-echo " Next: ./download_model.sh"
+echo " Next: ./kiln.sh get"
 echo "============================================================"

@@ -1,6 +1,6 @@
 @echo off
 setlocal enabledelayedexpansion
-cd /d "%~dp0"
+cd /d "%~dp0..\.."
 
 :: ============================================================
 ::  Measure the real quality cost of each Qwen3.8-27B quant on
@@ -33,7 +33,7 @@ set OUT=quant_quality.txt
 set CHUNKS=100
 
 if not exist "%PPL%" (
-    echo ERROR: %PPL% not found. Run update_llama_bin.bat.
+    echo ERROR: %PPL% not found. Run: kiln update
     pause & exit /b 1
 )
 
@@ -43,7 +43,7 @@ if not exist "%REF%" (
     echo.
     echo  KL-divergence needs a near-lossless baseline to compare
     echo  against. Download Q8_0 ^(29 GB^) via option [5] in
-    echo  download_qwen3.8_27b.bat, then re-run this script.
+    echo  kiln get, then re-run this script.
     echo ============================================================
     pause & exit /b 1
 )

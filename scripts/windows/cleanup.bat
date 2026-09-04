@@ -1,6 +1,6 @@
 @echo off
 setlocal enabledelayedexpansion
-cd /d "%~dp0"
+cd /d "%~dp0..\.."
 
 :: ============================================================
 ::  Free disk space before downloading Qwen3.8-27B.
@@ -75,7 +75,7 @@ for /f "usebackq delims=" %%F in (`powershell -NoProfile -Command ^
 echo ============================================================
 echo  Free space on C: : %FREE2% GB  ^(was %FREE% GB^)
 echo.
-echo  Next: download_qwen3.8_27b.bat
+echo  Next: kiln get
 echo ============================================================
 pause
 exit /b 0

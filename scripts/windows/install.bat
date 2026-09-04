@@ -1,6 +1,6 @@
 @echo off
 setlocal enabledelayedexpansion
-cd /d "%~dp0"
+cd /d "%~dp0..\.."
 
 echo ============================================================
 echo  Local Model Runtime - Windows Install
@@ -24,7 +24,7 @@ if exist "llama-bin\llama-server.exe" (
         echo [WARN] This build predates MTP speculative decoding
         echo        ^(merged in b9180, 2026-05-16^). Qwen3.8-27B will
         echo        run but you lose a large generation speedup.
-        echo        Run update_llama_bin.bat to upgrade.
+        echo        Run: kiln update
     )
 ) else (
     echo [*] Downloading llama.cpp binaries from GitHub...
@@ -99,11 +99,11 @@ if errorlevel 1 echo [WARN] nvidia-smi not found -- is the NVIDIA driver install
 echo.
 echo ============================================================
 echo  Setup complete. Next steps:
-echo    qwen update      -- upgrade llama.cpp if MTP is unavailable
-echo    qwen get both    -- stock and abliterated weights
-echo    qwen start       -- pick one and serve it
+echo    kiln update      -- upgrade llama.cpp if MTP is unavailable
+echo    kiln get both    -- stock and abliterated weights
+echo    kiln start       -- pick one and serve it
 echo.
-echo  Or just run  qwen  for a status board and a menu.
+echo  Or just run  kiln  for a status board and a menu.
 echo ============================================================
 echo.
 pause

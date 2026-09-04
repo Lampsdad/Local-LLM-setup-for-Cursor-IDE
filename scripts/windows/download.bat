@@ -1,6 +1,6 @@
 @echo off
 setlocal enabledelayedexpansion
-cd /d "%~dp0"
+cd /d "%~dp0..\.."
 
 :: ============================================================
 ::  Download: Qwen3.8-27B  (released 2026-08-05)
@@ -120,7 +120,7 @@ echo  Recommended free  : %NEEDED% GB  (includes 5 GB working margin)
 echo.
 powershell -NoProfile -Command "if ((Get-PSDrive C).Free/1GB -lt %NEEDED%) { exit 1 } else { exit 0 }"
 if errorlevel 1 (
-    echo  WARNING: not enough free space. Run cleanup_disk.bat first.
+    echo  WARNING: not enough free space. Run: kiln clean
     echo.
     set /p GOON="Continue anyway? [y/N]: "
     if /I not "!GOON!"=="y" exit /b 1
@@ -164,7 +164,7 @@ echo  Download complete: %FILE%
 echo.
 echo  Launch it with:
 echo      launch.bat            ^(picks between installed builds^)
-echo  or  start_qwen3.8_27b.bat %V_ID%
+echo  or  kiln start %V_ID%
 echo.
 echo  The start script finds the quant on its own -- nothing to
 echo  edit if you did not take the default.

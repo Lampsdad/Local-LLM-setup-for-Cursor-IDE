@@ -1,6 +1,6 @@
 @echo off
 setlocal enabledelayedexpansion
-cd /d "%~dp0"
+cd /d "%~dp0..\.."
 
 :: ============================================================
 ::  Model picker.
@@ -10,7 +10,7 @@ cd /d "%~dp0"
 ::    launch.bat ablit      abliterated build, no prompt
 ::
 ::  Both variants use the same port, the same MTP head and the
-::  same vision projector, and start_qwen3.8_27b.bat kills any
+::  same vision projector, and start.bat kills any
 ::  running server before starting -- so this switches between
 ::  them rather than running both. What actually changes is the
 ::  weights file and the --alias Cursor sees.
@@ -88,7 +88,7 @@ echo.
 choice /C YN /M "Download it now"
 if errorlevel 2 exit /b 0
 
-call "%~dp0download_qwen3.8_27b.bat" "%V_ID%"
+call "%~dp0download.bat" "%V_ID%"
 
 :: Re-probe rather than trusting the exit code: the download
 :: script offers a "continue anyway" path past its free-space
@@ -104,13 +104,13 @@ if not defined HAVE (
 echo.
 echo  Launching %V_LABEL% (%HAVE%)...
 echo.
-call "%~dp0start_qwen3.8_27b.bat" "%V_ID%"
+call "%~dp0start.bat" "%V_ID%"
 exit /b %errorlevel%
 
 :: ------------------------------------------------------------
 :: :probe <filename-prefix> <out-var>
 :: Sets <out-var> to the best quant present for that prefix, or
-:: clears it. Same order start_qwen3.8_27b.bat picks in, so the
+:: clears it. Same order start.bat picks in, so the
 :: menu reports the quant that would actually be loaded.
 :probe
 set "%~2="

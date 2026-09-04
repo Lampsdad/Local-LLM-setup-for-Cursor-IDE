@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/../.."
 
 echo "============================================================"
 echo " Local Model Runtime - Linux Install (NVIDIA CUDA)"
@@ -83,6 +83,6 @@ echo "[OK] models/ directory ready."
 echo
 echo "============================================================"
 echo " Setup complete! Next steps:"
-echo "   1. bash download_model.sh   -- downloads the ~30 GB model"
-echo "   2. bash start_linux.sh      -- launches server + tunnel"
+echo "   1. ./kiln.sh get     -- downloads the ~30 GB model"
+echo "   2. ./kiln.sh start   -- launches server + tunnel"
 echo "============================================================"

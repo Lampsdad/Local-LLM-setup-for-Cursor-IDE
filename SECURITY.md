@@ -28,9 +28,9 @@ thing standing between an anonymous request and your GPU.
   tracked.
 
 ```bat
-qwen key show           :: print it (generates it on first use)
-qwen key rotate         :: discard and regenerate
-qwen key set MY-SECRET  :: use a passphrase of your own
+kiln key show           :: print it (generates it on first use)
+kiln key rotate         :: discard and regenerate
+kiln key set MY-SECRET  :: use a passphrase of your own
 ```
 
 Rotating takes effect on the next server start, and you must paste the new
