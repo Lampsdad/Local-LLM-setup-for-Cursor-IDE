@@ -3,7 +3,7 @@
 **Run Qwen3.8-27B locally on your own GPU and use it inside Cursor as a
 free, private, drop-in replacement for GPT and Claude.** A self-hosted,
 OpenAI-compatible llama.cpp server with MTP speculative decoding, vision,
-and a 131K context window on a single 32 GB card — no subscription, no
+and a 112K context window on a single 32 GB card — no subscription, no
 code leaving your machine. Stock or abliterated, picked at launch.
 
 [![CI](https://github.com/Lampsdad/Local-LLM-setup-for-Cursor-IDE/actions/workflows/ci.yml/badge.svg)](https://github.com/Lampsdad/Local-LLM-setup-for-Cursor-IDE/actions/workflows/ci.yml)
@@ -49,9 +49,11 @@ want *this* model running *well*:
 - **Settings derived from the architecture, not copied from a 7B guide.**
   Qwen3.8 is 75% linear attention, which changes what KV precision and
   context sizing should be. The reasoning is written down below.
-- **Context sized to your actual GPU.** `kiln` reads your
-  VRAM and the weight files on disk and computes the window that fits,
-  rather than assuming a card you may not own.
+- **Sized to your actual GPU, before you download 21 GB.** `kiln
+  hardware` reads your VRAM and picks the model, quant, MTP head and
+  context window that fit, rather than assuming a card you may not own.
+  On a 12 GB card that means a different *model*, not just a smaller
+  context.
 - **A measurement path, not just claims.** `benchmark_qwen3.8.*` and
   `quality` let you check every tuning decision here
   against your own hardware and your own copies of the files.
@@ -62,44 +64,109 @@ want *this* model running *well*:
 
 ## Will this run on my GPU?
 
-Context window that fits, by card and quant. Computed with the same
-formula the launcher uses; `--` means it will not load.
+Ask it:
 
-**With MTP + vision enabled** (the default, and what you want):
+```
+kiln hardware          # Windows
+./kiln.sh hardware     # macOS / Linux
+```
 
-| Quant | 16 GB | 24 GB | 32 GB | 48 GB |
-|---|---|---|---|---|
-| `UD-IQ3_XXS` | — | 128K | 256K | 256K |
-| `UD-Q4_K_XL` | — | — | 184K | 256K |
-| **`UD-Q5_K_XL`** | — | — | **131K** | 256K |
-| `UD-Q6_K_XL` | — | — | — | 256K |
-| `Q8_0` | — | — | — | 256K |
+It reads your GPU, picks the model, quant, MTP head and context window
+that fit, and prints exactly what `kiln get` would download. Everything
+below is that same calculation, run ahead of time for common cards — you
+should not need to read it.
 
-**Without the MTP head** (frees ~3.5 GB, costs you the speedup):
+**Qwen3.8-27B** (with MTP q8_0 + vision f16)
 
-| Quant | 16 GB | 24 GB | 32 GB | 48 GB |
-|---|---|---|---|---|
-| `UD-IQ3_XXS` | 12K | 216K | 256K | 256K |
-| `UD-Q4_K_XL` | — | 72K | 256K | 256K |
-| `UD-Q5_K_XL` | — | 16K | 216K | 256K |
-| `UD-Q6_K_XL` | — | — | 84K | 256K |
-| `Q8_0` | — | — | — | 256K |
+| Quant | 12 GB | 16 GB | 24 GB | 32 GB | 48 GB |
+|---|---|---|---|---|---|
+| `UD-Q8_K_XL` | — | — | — | — | 256K |
+| `Q8_0` | — | — | — | — | 256K |
+| `UD-Q6_K_XL` | — | — | — | 8K | 256K |
+| `UD-Q5_K_XL` | — | — | — | 112K | 256K |
+| `UD-Q4_K_XL` | — | — | — | 192K | 256K |
+| `UD-IQ4_XS` | — | — | 68K | 256K | 256K |
+| `UD-Q3_K_XL` | — | — | 96K | 256K | 256K |
+| `UD-IQ3_S` | — | — | 120K | 256K | 256K |
+| `UD-IQ3_XXS` | — | — | 148K | 256K | 256K |
+| `UD-Q2_K_XL` | — | — | 172K | 256K | 256K |
+| `UD-IQ2_S` | — | 4K | 208K | 256K | 256K |
 
-**Reading this table:**
+**Qwen3.8-9B distill** (text-only)
 
-- **32 GB (5090 / 4090 48GB mod / A6000)** — the target. `UD-Q5_K_XL`
-  with MTP and vision at 131K is the default and needs no configuration.
-- **24 GB (3090 / 4090 / 7900 XTX)** — you must choose. `UD-IQ3_XXS`
-  keeps MTP and a large window but is weak at agentic tool-calling;
-  `UD-Q4_K_XL` without MTP is the better coding model at 72K. Delete the
-  MTP GGUF to take the second path.
-- **16 GB** — 27B is the wrong size for this card. Qwen3.8's smaller
-  siblings will serve you far better.
+| Quant | 12 GB | 16 GB | 24 GB | 32 GB | 48 GB |
+|---|---|---|---|---|---|
+| `Q8_0` | — | 168K | 256K | 256K | 256K |
+| `Q6_K` | 68K | 256K | 256K | 256K | 256K |
+| `Q5_K_M` | 112K | 256K | 256K | 256K | 256K |
+| `Q4_K_M` | 156K | 256K | 256K | 256K | 256K |
+
+**Qwen3.8-4B distill** (text-only)
+
+| Quant | 12 GB | 16 GB | 24 GB | 32 GB | 48 GB |
+|---|---|---|---|---|---|
+| `Q8_0` | 212K | 256K | 256K | 256K | 256K |
+| `Q6_K` | 256K | 256K | 256K | 256K | 256K |
+| `Q5_K_M` | 256K | 256K | 256K | 256K | 256K |
+| `Q4_K_M` | 256K | 256K | 256K | 256K | 256K |
+
+Every cell above assumes the q8_0 MTP head and the f16 vision
+projector. The recommendation below may take the smaller q4_0
+head (-1.4 GB) or drop vision, so it can show a larger window
+than the matching cell above.
+
+**What each card is recommended**
+
+| Card | Tier | Model | Quant | MTP | Vision | Context |
+|---|---|---|---|---|---|---|
+| 12 GB | 12GB | Qwen3.8-9B distill | `Q5_K_M` | off | off | 112K |
+| 16 GB | 16GB | Qwen3.8-9B distill | `Q8_0` | off | off | 168K |
+| 24 GB | 24GB | Qwen3.8-27B | `UD-IQ4_XS` | q4_0 | f16 | 104K |
+| 32 GB | 32GB | Qwen3.8-27B | `UD-Q5_K_XL` | q8_0 | f16 | 112K |
+| 48 GB | 48GB | Qwen3.8-27B | `UD-Q8_K_XL` | q8_0 | f16 | 256K |
+
+**Reading this:**
+
 - **48 GB+** — everything fits at the model's full 256K.
+- **32 GB (5090 / A6000)** — the tuned target. `UD-Q5_K_XL` with the
+  q8_0 MTP head and vision at 112K, and no configuration needed.
+- **24 GB (3090 / 4090 / 7900 XTX)** — `UD-IQ4_XS` with the **q4_0** MTP
+  head. Earlier versions of this README told you to give up MTP here;
+  that was wrong. The smaller head costs 1.4 GB instead of 3.0 GB and
+  keeps the 1.5–2x speedup at a better quant than dropping it would buy.
+- **16 GB and below** — a 27B is the wrong model for the card. Below
+  `UD-IQ4_XS` it gets noticeably worse at the tool-calling that agentic
+  coding is mostly made of, so `kiln` moves you to a smaller model at a
+  good quant rather than a big one at a bad one.
 
-Apple Silicon and Linux use `--fit on`, which lets llama.cpp size the
-window against unified/GPU memory at load time, so no table lookup is
-needed there.
+### The smaller models
+
+Qwen shipped no small dense sibling in the 3.8 family — the official
+lineup is 27B, Flash-Next (a 180B MoE) and 2.4T-A95B. So for 16 GB and
+under, `kiln` offers two **third-party** builds:
+
+| Build | What it is | License |
+|---|---|---|
+| `9b` | [empero-ai/Qwen3.8-9B-Distill-GGUF](https://huggingface.co/empero-ai/Qwen3.8-9B-Distill-GGUF) — Qwen3.8-2.4T-A95B distilled into the Qwen3.5-9B architecture | Apache-2.0 |
+| `4b` | [empero-ai/Qwen3.8-4B-Distill-GGUF](https://huggingface.co/empero-ai/Qwen3.8-4B-Distill-GGUF) — the same, at 4B | Apache-2.0 |
+
+These are **not Qwen releases** and have not been evaluated here. Both
+are text-only: their GGUF repos ship no vision projector and no MTP
+head, so vision and the speculative-decoding speedup are unavailable
+whatever card you run them on. Every surface that offers them says so.
+They are still the better answer than a 27B at 2 bits.
+
+### Trading context against quality
+
+`kiln` maximises quant quality subject to clearing a context floor,
+which defaults to 96K — enough for agentic coding, and the bar that
+reproduces the hand-validated 32 GB configuration. Move it if your job
+is different:
+
+```
+KILN_MIN_CTX=32768  kiln hardware    # short prompts, best quant
+KILN_MIN_CTX=200000 kiln hardware    # window over everything
+```
 
 ---
 
@@ -209,7 +276,7 @@ Two consequences:
   `16 layers × 4 KV heads × 256 head-dim × 2 (K+V)` = 32,768
   elements/token → **64 KiB/token at f16, 34 KiB at q8_0**. A comparable
   dense transformer with all 64 layers cached would cost four times as
-  much. This is why the table above shows 131K where a normal 27B would
+  much. This is why the tables above show 112K where a normal 27B would
   give you 16K.
 - **Low-bit KV hurts more than usual.** In recurrent layers, error
   accumulates *along the sequence* instead of being re-anchored against a
@@ -294,8 +361,15 @@ what the tuning numbers below were measured on.
 | `Q8_0` | 29.0 GB | ~0.01% | reference for benchmarking only |
 | `UD-Q6_K_XL` | 25.9 GB | ~0.05% | needs 48 GB to keep the MTP head |
 | **`UD-Q5_K_XL`** | **20.2 GB** | **~0.2%** | **default — best quality that keeps MTP on 32 GB** |
-| `UD-Q4_K_XL` | 17.9 GB | ~0.7% | best coding model that fits 24 GB, MTP off |
-| `UD-IQ3_XXS` | 11.9 GB | ~3% | keeps MTP on 24 GB; weak on agentic tool-calling |
+| `UD-Q4_K_XL` | 17.6 GB | ~0.7% | 192K on 32 GB with MTP |
+| `UD-IQ4_XS` | 14.3 GB | ~1% | **24 GB pick** — keeps MTP with the q4_0 head |
+| `UD-Q3_K_XL` | 13.1 GB | ~2% | more window on 24 GB, weaker tool-calling |
+| `UD-IQ3_XXS` | 10.9 GB | ~3% | below the floor `kiln` will pick on its own |
+
+Eleven quants are available for both 27B builds; the full ladder is in
+`scripts/hardware.py`, and `kiln get` lists every one with the context it
+would leave on your card. `kiln` will not choose below `UD-IQ4_XS` by
+itself — see the note about the quality floor above.
 
 The KLD column is a **general pattern for 27B-class dense models, not a
 measurement of Qwen3.8**. To measure it on your own files, run
@@ -308,13 +382,13 @@ instructions on step 12 of a 20-step task**. Perplexity can look fine
 while the argmax token flips; KLD and the "same top token" rate catch
 that.
 
-### VRAM budget at the default (UD-Q5_K_XL, 131K ctx, 32 GB card)
+### VRAM budget at the default (UD-Q5_K_XL, 112K ctx, 32 GB card)
 
 ```
 weights  UD-Q5_K_XL        18.83 GiB
 MTP head Q8_0               2.95 GiB
 mmproj   F16                0.86 GiB
-KV @131K q8_0 (16 layers)   4.25 GiB
+KV @112K q8_0 (16 layers)   3.72 GiB
 MTP draft KV                0.50 GiB
 DeltaNet recurrent state    0.15 GiB
 compute buffer             ~2.00 GiB
@@ -420,13 +494,19 @@ NOTES.md               why the tuned constants are what they are
 | `download.bat` | Weights + MTP head + vision projector, for one build. Resumable. |
 | `launch.bat` | Model picker: stock or abliterated, downloading first if needed. Takes `base` / `ablit` to skip the menu. |
 | `start.bat` | Tuned launcher. Auto-detects build, quant, MTP, vision, VRAM and cores. |
-| `probe_hardware.ps1` | Reads VRAM/cores and computes the context window that fits. |
+| `probe_hardware.ps1` | Fallback sizer for machines without Python. `hardware.py` is the normal path. |
 | `benchmark.bat` | Quant speed, ubatch sweep, KV precision, throughput vs depth. |
 | `quality.bat` | KL-divergence of each quant against Q8_0. |
 | `cleanup.bat` | Reclaim space from superseded GGUFs. Requires typing `DELETE`. |
-| `lib_variants.bat` | Definition of each build — repo, filename prefix, Cursor alias. Add a third variant here. |
+| `lib_variants.bat` | Resolves a build to its repo, filename prefix and Cursor alias. Reads the registry from `hardware.py`. |
 | `lib_api_key.bat` | Generates the API key, locks the file to your account, hands back `API_KEY`. |
 | `lib_ui.bat` | ANSI palette for the CLI. Degrades to empty strings under `NO_COLOR`. |
+
+**Shared** (`scripts/`)
+
+| Script | Purpose |
+|---|---|
+| `hardware.py` | The model registry and the sizing arithmetic. Detects the GPU, picks model + quant + MTP + context, and generates the tables above. Used by every other script on both platforms. |
 
 **macOS and Linux** (`scripts/unix/`)
 
@@ -434,11 +514,13 @@ NOTES.md               why the tuned constants are what they are
 |---|---|
 | `install_mac.sh` / `install_linux.sh` / `install_fedora.sh` | One-time setup, per platform. |
 | `download.sh` | Weights + MTP head + vision projector. `QUANT=` and `VARIANT=` override. |
-| `start_mac.sh` / `start_linux.sh` / `start_fedora.sh` | Tuned launchers, sizing context with `--fit on`. |
+| `start_mac.sh` / `start_linux.sh` / `start_fedora.sh` | Tuned launchers. Context comes from `hardware.py`, falling back to `--fit on`. |
 | `slurm-llama.sh` | Run the server as a Slurm job so the GPU shows as allocated. |
 | `start-cloudflared-once.sh` | Bring up the tunnel on its own. |
 | `benchmark.sh` / `quality.sh` / `cleanup.sh` | Shell twins of the Windows tools. |
 | `lib_variants.sh` / `lib_api_key.sh` | Shell twins of the Windows libraries. |
+| `lib_select.sh` | Picks the weights, MTP head, vision projector and context for a launch. Shared by all three start scripts. |
+| `lib_python.sh` | Finds a Python that actually runs, and strips the CR that Windows Python puts on every line. |
 
 ---
 
@@ -447,7 +529,7 @@ NOTES.md               why the tuned constants are what they are
 | Flag | Value | Why |
 |---|---|---|
 | `--n-gpu-layers` | 99 | all 64 layers on GPU |
-| `--ctx-size` | detected | computed from your VRAM by `probe_hardware.ps1`; `--fit on` does the same job on Unix |
+| `--ctx-size` | detected | computed from your VRAM by `scripts/hardware.py`, on both platforms; falls back to `--fit on` when there is no Python or no GPU to read |
 | `--flash-attn` | `auto` | not `on` — gated attention at 256 head-dim falls back cleanly instead of erroring |
 | `--cache-type-k/v` | `q8_0` | halves KV vs f16; **not** `q4_0`, see the recurrent-layer note above |
 | `--parallel` | `1` | **the easy win.** The default (`-1` = auto) splits the KV cache across slots, so each request gets `ctx/N`. Single-user Cursor wants the whole window in one slot. |
@@ -516,10 +598,19 @@ works against localhost directly.
 and cannot be pointed at a custom endpoint. Chat, `Ctrl+K`, Composer and
 `@Codebase` all work.
 
-**Will it run on a 3090, 4090 or 7900 XTX (24 GB)?** Yes, but you have to
-choose between MTP and quant quality — see
-[the table above](#will-this-run-on-my-gpu). On 16 GB, pick a smaller
-model instead.
+**Will it run on a 3090, 4090 or 7900 XTX (24 GB)?** Yes. `kiln` picks
+`UD-IQ4_XS` with the smaller q4_0 MTP head, which keeps speculative
+decoding at about 104K context — you do not have to choose between them.
+Run `kiln hardware` to see it for your card.
+
+**Will it run on 16 GB, or 12 GB?** Yes, but not the 27B — `kiln` moves
+you to one of the smaller distills instead. See
+[the tables above](#will-this-run-on-my-gpu).
+
+**Why did `kiln` pick a different quant than the README's default?**
+Because the default is for a 32 GB card and yours is not one. What `kiln
+hardware` prints wins over any number written here; the tables are that
+same calculation run ahead of time.
 
 **Does this work with VS Code, Continue, Cline, Roo Code, Zed or Aider?**
 Yes. The server is a plain OpenAI-compatible endpoint, so anything that

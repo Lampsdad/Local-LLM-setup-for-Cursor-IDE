@@ -89,6 +89,10 @@ set STEP=2
 call :score "models\Qwen3.8-27B-UD-Q6_K_XL.gguf"
 call :score "models\Qwen3.8-27B-UD-Q5_K_XL.gguf"
 call :score "models\Qwen3.8-27B-UD-Q4_K_XL.gguf"
+:: IQ4_XS and Q3_K_XL are what kiln picks on a 24 GB card, so a
+:: 24 GB user gets a populated report rather than an empty one.
+call :score "models\Qwen3.8-27B-UD-IQ4_XS.gguf"
+call :score "models\Qwen3.8-27B-UD-Q3_K_XL.gguf"
 call :score "models\Qwen3.8-27B-UD-IQ3_XXS.gguf"
 
 echo. >> "%OUT%"

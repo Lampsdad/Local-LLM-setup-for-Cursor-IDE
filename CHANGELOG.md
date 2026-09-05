@@ -4,6 +4,67 @@ Notable changes to the scripts. Dates are the commit dates on `main`.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- **`kiln hardware`** — reads the GPU and prints the model, quant, MTP
+  head, vision projector and context window that fit it, which is exactly
+  what `kiln get` will download. Available as `kiln hardware` and
+  `./kiln.sh hardware`.
+- **`scripts/hardware.py`** — the model registry and the sizing
+  arithmetic, shared by every script on both platforms. Holds the repos,
+  the quant ladders with exact byte counts, and the per-family KV-cache
+  model. Also generates the context tables in `README.md`, so the docs
+  cannot drift from the code.
+- **Two smaller model families**, for cards a 27B has no business on:
+  `9b` and `4b`, Empero's Apache-2.0 distillations of Qwen3.8-2.4T-A95B.
+  Both are third-party rather than Qwen releases, and are labelled as such
+  everywhere they are offered. Both are text-only — no MTP head, no vision.
+- **Six more 27B quants.** The ladder is now the eleven `UD-*` names
+  present in both the unsloth and huihui-ai repos, rather than five.
+- **The q4_0 MTP head and the q8_0 vision projector.** 1.4 GB and 0.3 GB
+  smaller than the ones used before, and the reason a 24 GB card can now
+  keep speculative decoding.
+
+### Changed
+
+- **The default model and context window are chosen from your GPU, not
+  assumed.** `kiln get` used to default to `UD-Q5_K_XL` on every machine —
+  right on the 32 GB card this repo was tuned on, a guaranteed OOM on a
+  12 GB one. Downloads, launches and menus now default to what fits, and
+  say what they picked. An explicit `QUANT=` or `VARIANT=` still wins.
+- **24 GB cards no longer have to choose between MTP and quant quality.**
+  `UD-IQ4_XS` with the q4_0 head reaches ~104K with speculative decoding
+  on. The README previously recommended giving up MTP for `UD-Q4_K_XL` at
+  72K; that advice predated the smaller head.
+- **`kiln start` prefers the tier's quant among the files on disk** and
+  prints a one-line note when a better one exists, but never re-picks
+  weights behind your back.
+- The three Unix start scripts and `slurm-llama.sh` now share
+  `lib_select.sh` instead of each carrying its own hardcoded quant, MTP
+  filename and context.
+
+### Fixed
+
+- **The documented 131K context on a 32 GB card was never what the code
+  produced.** The probe computes 114688 with `UD-Q5_K_XL` + the q8_0 head
+  + f16 vision; 131072 is what loaded when tried by hand. The comment
+  claiming the 0.85 safety factor reproduced 131072 was wrong, and every
+  131K in the README has been corrected to the computed figure.
+- **`start_mac.sh` and `start_fedora.sh` exited silently when the vision
+  projector was absent.** `[ -f "$MMPROJ" ] && EXTRA+=(...)` returns
+  non-zero under `set -euo pipefail`, killing the script before it printed
+  anything. Same bug in `slurm-llama.sh`.
+- **The Unix scripts could not find Python on Windows shells.** `command
+  -v python3` resolves to the Microsoft Store alias stub, which exits 0
+  and prints nothing, so every lookup silently fell back. `lib_python.sh`
+  now verifies the interpreter answers, and strips the CR that Windows
+  Python puts on each line — a trailing `` made `V_MTP` compare unequal
+  to `1` while still printing as `1`.
+- **The status board's "shared files" row** reported "no MTP head" on
+  machines given the q4_0 head, because it matched the q8_0 filename only.
+
 ## [1.0.0] — 2026-09-03
 
 First tagged release. The repo has been usable for months; this marks the

@@ -34,17 +34,19 @@ call "%~dp0lib_ui.bat"
 :: An explicit argument wins. With none, run whichever variant is
 :: actually on disk, preferring the stock one when both are.
 set "WANT=%~1"
-if not defined WANT (
-    set "WANT=base"
-    if not exist "models\Qwen3.8-27B-*.gguf" (
-        if exist "models\Huihui-Qwen3.8-27B-abliterated-*.gguf" set "WANT=ablit"
-    )
-)
+if not defined WANT call :autopick_variant
 call "%~dp0lib_variants.bat" "%WANT%"
 if errorlevel 1 (
-    echo  ERROR: unknown variant "%WANT%" -- expected "base" or "ablit".
+    echo  ERROR: unknown variant "%WANT%" -- expected base, ablit, 9b or 4b.
     pause & exit /b 1
 )
+
+:: Last-resort context when neither hardware.py nor
+:: probe_hardware.ps1 could read the GPU at all. It assumes the
+:: 32 GB card this repo was tuned on -- wrong on anything smaller,
+:: but it only applies when there is no information to be right
+:: with, and llama.cpp's own error is clearer than a guess at zero.
+set CTX_FALLBACK=114688
 
 set BINARY=llama-bin\llama-server.exe
 set PORT=8080
@@ -56,28 +58,35 @@ set CF_EXE=C:\Program Files (x86)\cloudflared\cloudflared.exe
 :: failure this picker exists to prevent.
 set ALIAS=%V_ALIAS%
 
-set MMPROJ=models\mmproj-F16.gguf
-set MTP=models\mtp-Qwen3.8-27B-Q8_0.gguf
-
 :: ---- pick whichever weight file is present, best first ----
-:: Both repos publish the same quant suffixes, so one list covers
-:: both variants -- :pick prepends the variant's filename prefix.
-::
-:: The second argument is only a fallback for machines where
-:: nvidia-smi is unavailable; normally probe_hardware.ps1 computes
-:: the context window from the GPU actually present. The fallback
-:: values assume a 32 GB card.
+:: The ladder comes from the registry (V_QUANTS) rather than being
+:: spelled out here, so adding a quant means editing hardware.py
+:: and nothing else. :pick prepends the variant's filename prefix
+:: and the first match wins, so registry order IS preference order.
 set "MODEL="
-call :pick "UD-Q5_K_XL" 131072
-call :pick "UD-Q4_K_XL" 196608
-call :pick "UD-Q6_K_XL" 32768
-call :pick "Q8_0"       16384
-call :pick "UD-IQ3_XXS" 262144
+for %%Q in (%V_QUANTS%) do call :pick "%%Q"
 
 if not defined MODEL (
     echo  ERROR: no %V_LABEL% weights found in models\
     echo  Run: kiln get %V_ID%
     pause & exit /b 1
+)
+
+:: ---- MTP head and vision projector -------------------------
+:: 27B-only, and each comes in two precisions. Take whichever is
+:: on disk, better first. The q4_0 head is 1.4 GB smaller than
+:: q8_0, which on a 24 GB card is the difference between keeping
+:: speculative decoding and losing it -- kiln get downloads
+:: whichever one the card had room for.
+set "MTP="
+set "MMPROJ="
+if "%V_MTP%"=="1" (
+    if exist "models\mtp-Qwen3.8-27B-Q8_0.gguf" set "MTP=models\mtp-Qwen3.8-27B-Q8_0.gguf"
+    if not defined MTP if exist "models\mtp-Qwen3.8-27B-Q4_0.gguf" set "MTP=models\mtp-Qwen3.8-27B-Q4_0.gguf"
+)
+if "%V_VISION%"=="1" (
+    if exist "models\mmproj-F16.gguf" set "MMPROJ=models\mmproj-F16.gguf"
+    if not defined MMPROJ if exist "models\mmproj-Qwen3.8-27B-Q8_0.gguf" set "MMPROJ=models\mmproj-Qwen3.8-27B-Q8_0.gguf"
 )
 
 if not exist "%BINARY%" (
@@ -87,22 +96,31 @@ if not exist "%BINARY%" (
 
 :: ---- MTP requires a build with draft-mtp support (b9180+) ----
 set USE_MTP=0
-"%BINARY%" --help 2>&1 | findstr /C:"draft-mtp" >nul
-if not errorlevel 1 (
-    if exist "%MTP%" set USE_MTP=1
-) else (
-    echo  [WARN] this llama.cpp build predates MTP support ^(merged b9180^).
-    echo         Run: kiln update  for the ~1.5-2x speedup.
+if defined MTP (
+    "%BINARY%" --help 2>&1 | findstr /C:"draft-mtp" >nul
+    if not errorlevel 1 (
+        set USE_MTP=1
+    ) else (
+        echo  [WARN] this llama.cpp build predates MTP support ^(merged b9180^).
+        echo         Run: kiln update  for the ~1.5-2x speedup.
+    )
 )
 
 :: ---- vision ----
 set USE_VISION=0
-if exist "%MMPROJ%" set USE_VISION=1
+if defined MMPROJ set USE_VISION=1
 
 :: ---- size to the machine actually present ----
 :: Context and thread count used to be hardcoded for an RTX 5090 +
-:: 9900X3D. probe_hardware.ps1 derives both from the GPU and CPU it
-:: finds, so this runs unmodified on a 16 or 24 GB card.
+:: 9900X3D. Both are now derived from the GPU and CPU actually
+:: found, so this runs unmodified on a 12, 16 or 24 GB card.
+::
+:: hardware.py is the preferred path: it knows the per-family KV
+:: arithmetic (a 9B distill caches half as much per token as the
+:: 27B, so reusing one constant would misjudge it by 2x) and it can
+:: say whether this machine would have picked something else.
+:: probe_hardware.ps1 stays as the no-Python fallback and assumes
+:: the 27B numbers, which is correct for what it can be asked.
 set "PROBE_MTP="
 set "PROBE_MMPROJ="
 if "%USE_MTP%"=="1"    set "PROBE_MTP=%MTP%"
@@ -112,7 +130,18 @@ set PROBED=0
 set VRAM_MIB=0
 set CORES=0
 set CTX=0
-for /f "usebackq tokens=1,2 delims==" %%A in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0probe_hardware.ps1" -Model "%MODEL%" -Mtp "%PROBE_MTP%" -Mmproj "%PROBE_MMPROJ%" 2^>nul`) do set "%%A=%%B"
+set TIER_LABEL=
+set REC_SAME=1
+set REC_FAMILY=
+set REC_QUANT=
+set REC_CTX=0
+
+call :find_python
+if defined PY_EXE for /f "usebackq tokens=1,* delims==" %%A in (`%PY_EXE% "%~dp0..\hardware.py" --size-model "%MODEL%" --mtp "%PROBE_MTP%" --mmproj "%PROBE_MMPROJ%" 2^>nul`) do set "%%A=%%B"
+
+if "%CTX%"=="0" if "%PROBED%"=="0" (
+    for /f "usebackq tokens=1,2 delims==" %%A in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0probe_hardware.ps1" -Model "%MODEL%" -Mtp "%PROBE_MTP%" -Mmproj "%PROBE_MMPROJ%" 2^>nul`) do set "%%A=%%B"
+)
 
 if "%CORES%"=="0" set CORES=8
 
@@ -129,9 +158,19 @@ if "%CTX%"=="0" (
     echo  ERROR: these weights do not leave room for any context on a
     echo         %VRAM_MIB% MiB GPU.
     echo.
-    if "%USE_MTP%"=="1" echo    - the MTP head costs ~3 GB; delete %MTP% to trade
-    if "%USE_MTP%"=="1" echo      speed for context, or
-    echo    - use a smaller quant. See the quant table in README.md.
+    if defined REC_QUANT (
+        set /a REC_KCTX=!REC_CTX!/1024
+        echo    What fits this card:  %REC_FAMILY%  %REC_QUANT%
+        echo    at !REC_KCTX!K context. Get it with:
+        echo.
+        echo        kiln get %REC_FAMILY%
+        echo.
+        echo    and take the default quant it offers.
+    ) else (
+        if "%USE_MTP%"=="1" echo    - the MTP head costs ~3 GB; delete %MTP% to trade
+        if "%USE_MTP%"=="1" echo      speed for context, or
+        echo    - use a smaller quant. See the quant table in README.md.
+    )
     echo.
     pause & exit /b 1
 )
@@ -160,11 +199,23 @@ echo  %V_LABEL%
 echo ------------------------------------------------------------
 echo   weights : %MODEL%
 echo   context : %CTX%  ^(sized to %VRAM_MIB% MiB VRAM^)
+if defined TIER_LABEL echo   hardware: %TIER_LABEL%
 echo   threads : %CORES%  ^(physical cores^)
 if "%USE_MTP%"=="1"    (echo   MTP     : enabled  ^(%MTP%^)) else (echo   MTP     : disabled)
 if "%USE_VISION%"=="1" (echo   vision  : enabled) else (echo   vision  : disabled)
 echo   alias   : %ALIAS%
 echo ============================================================
+
+:: What is on disk always wins -- re-picking the weights behind the
+:: user's back would be worse than running the wrong ones knowingly.
+:: But if this machine would have chosen differently, say so once,
+:: with the command that would change it.
+if "%REC_SAME%"=="0" if defined REC_QUANT (
+    set /a REC_KCTX=!REC_CTX!/1024
+    echo.
+    echo  [note] for this GPU kiln would pick %REC_FAMILY% %REC_QUANT%
+    echo         at !REC_KCTX!K context. To switch:  kiln get %REC_FAMILY%
+)
 if "%V_UNCENSORED%"=="1" (
     echo.
     echo  This build has had its refusal behaviour ablated. It answers
@@ -349,14 +400,48 @@ pause >nul
 exit /b 0
 
 :: ------------------------------------------------------------
-:: :pick <quant-suffix> <fallback-ctx>
-:: First match wins, so the calls above are ordered best-first.
+:: :pick <quant-suffix>
+:: First match wins, so registry order is preference order.
 :pick
 if defined MODEL exit /b 0
 set "CAND=models\%V_PREFIX%-%~1.gguf"
-if exist "%CAND%" (
-    set "MODEL=%CAND%"
-    set "CTX_FALLBACK=%~2"
+if exist "%CAND%" set "MODEL=%CAND%"
+exit /b 0
+
+:: ------------------------------------------------------------
+:: :autopick_variant
+:: With no argument, run whichever family is actually on disk,
+:: best first. The 27B builds outrank the distills, and the stock
+:: 27B outranks the abliterated one, so a machine holding several
+:: starts the one you would have picked by hand.
+:autopick_variant
+set "WANT=base"
+if exist "models\Qwen3.8-27B-*.gguf" exit /b 0
+set "WANT=ablit"
+if exist "models\Huihui-Qwen3.8-27B-abliterated-*.gguf" exit /b 0
+set "WANT=9b"
+if exist "models\Qwen3.8-9B-*.gguf" exit /b 0
+set "WANT=4b"
+if exist "models\Qwen3.8-4B-*.gguf" exit /b 0
+:: Nothing at all: fall back to base so the error message that
+:: follows names a real variant to go and download.
+set "WANT=base"
+exit /b 0
+
+:: ------------------------------------------------------------
+:: Sets PY_EXE, or leaves it undefined. "python" on a stock
+:: Windows can be the App Execution Alias stub that opens the
+:: Store and prints nothing, so check it actually answers.
+::
+:: %PY_EXE% must be used UNQUOTED inside a for/f backquote: cmd
+:: re-parses that command line, and a quoted program name followed
+:: by further quoted arguments breaks the re-parse silently.
+:find_python
+set "PY_EXE="
+for %%P in (python python3 py) do (
+    if not defined PY_EXE (
+        %%P -c "import sys" >nul 2>&1 && set "PY_EXE=%%P"
+    )
 )
 exit /b 0
 

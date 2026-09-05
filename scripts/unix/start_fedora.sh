@@ -5,12 +5,15 @@ cd "$SCRIPT_DIR/../.."
 
 # VARIANT=base (stock) or VARIANT=ablit (abliterated).
 # Both share the MTP head and the vision projector below.
-. "$SCRIPT_DIR/lib_variants.sh"
+# With no VARIANT set, resolve it from what is on disk -- see the
+# KILN_PICK block in lib_variants.sh.
+KILN_PICK=disk . "$SCRIPT_DIR/lib_variants.sh"
 
-QUANT="${QUANT:-UD-Q5_K_XL}"
-MODEL="./models/${V_PREFIX}-${QUANT}.gguf"
-MMPROJ="./models/mmproj-F16.gguf"
-MTP="./models/mtp-Qwen3.8-27B-Q8_0.gguf"
+# Resolves MODEL / MTP / MMPROJ / FIT_ARGS against the weights
+# actually on disk and the GPU actually present. QUANT= still
+# overrides the choice of file.
+echo "  build   : ${V_LABEL}"
+. "$SCRIPT_DIR/lib_select.sh"
 BINARY="./llama-bin/llama-server"
 PORT=8080
 LOG="./server.log"
@@ -37,17 +40,22 @@ sleep 1
 
 # ── start llama-server ───────────────────────────────────────
 EXTRA=()
-if [ -f "$MTP" ] && "$BINARY" --help 2>&1 | grep -q 'draft-mtp'; then
+if [ -n "$MTP" ] && "$BINARY" --help 2>&1 | grep -q 'draft-mtp'; then
     EXTRA+=(--spec-type draft-mtp --spec-draft-model "$MTP" \
             --spec-draft-ngl 99 --spec-draft-n-max 3)
     echo "MTP speculative decoding: enabled"
 fi
-[ -f "$MMPROJ" ] && EXTRA+=(--mmproj "$MMPROJ")
+# Plain if: under set -e a failing `[ -f x ] && ...` aborts
+# the script, which killed this before it printed anything
+# whenever the vision projector was absent.
+if [ -n "$MMPROJ" ]; then
+    EXTRA+=(--mmproj "$MMPROJ")
+fi
 
 echo "Starting llama-server..."
 "$BINARY" \
     --model        "$MODEL" \
-    --fit          on \
+    "${FIT_ARGS[@]}" \
     --n-gpu-layers 99 \
     --flash-attn   auto \
     --cache-type-k q8_0 \

@@ -78,9 +78,14 @@ $driverReserve  = 1536   # desktop compositor / driver overhead
 
 # Allocation is not exact: buffers fragment, the compute buffer grows
 # with batch shape, and the driver's own footprint moves around. Aiming
-# at 100% of the arithmetic budget reliably OOMs. 0.85 reproduces the
-# 131072 that was hand-validated on a 32 GB card with UD-Q5_K_XL +
-# MTP + vision, and stays conservative on smaller cards.
+# at 100% of the arithmetic budget reliably OOMs.
+#
+# This comment used to claim 0.85 reproduces the hand-validated 131072
+# on a 32 GB card. It does not: with UD-Q5_K_XL + the q8_0 MTP head +
+# f16 vision on a 32607 MiB card it yields 114688. 131072 is what
+# actually loaded when it was tried by hand, i.e. the 0.85 margin is
+# real headroom rather than a fit to that number. Left at 0.85 -- the
+# margin is the point, and it is what keeps smaller cards safe.
 $safety = 0.85
 
 $ctx    = 0

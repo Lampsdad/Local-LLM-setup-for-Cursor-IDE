@@ -99,6 +99,8 @@ for f in \
     "models/Qwen3.8-27B-UD-Q6_K_XL.gguf" \
     "models/Qwen3.8-27B-UD-Q5_K_XL.gguf" \
     "models/Qwen3.8-27B-UD-Q4_K_XL.gguf" \
+    "models/Qwen3.8-27B-UD-IQ4_XS.gguf" \
+    "models/Qwen3.8-27B-UD-Q3_K_XL.gguf" \
     "models/Qwen3.8-27B-UD-IQ3_XXS.gguf"
 do
     [ -f "$f" ] || continue

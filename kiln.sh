@@ -4,8 +4,9 @@
 #
 #    ./kiln.sh                status board
 #    ./kiln.sh setup          llama.cpp + cloudflared + models/
-#    ./kiln.sh get [base|ablit|both]
-#    ./kiln.sh start [base|ablit]
+#    ./kiln.sh hardware       what this GPU can run
+#    ./kiln.sh get [base|ablit|9b|4b|both]
+#    ./kiln.sh start [base|ablit|9b|4b]
 #    ./kiln.sh stop           stop server and tunnel
 #    ./kiln.sh key [show|rotate]
 #    ./kiln.sh bench | quality | clean | help
@@ -44,6 +45,14 @@ START="$UNIX/start_${PLATFORM}.sh"
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
+# hardware.py sizes every launch and holds the model registry.
+# Empty when Python is absent; every caller below degrades rather
+# than failing, so kiln still works on a machine that only has
+# weights already on disk. lib_python.sh rejects the Windows
+# Store stub, which is on PATH as "python3" but runs nothing.
+. "$UNIX/lib_python.sh"
+PY="$KILN_PY"
+
 # ---- status board ------------------------------------------
 status() {
     local bin="./llama-bin/llama-server"
@@ -76,6 +85,27 @@ status() {
         printf '  %-14s %s\n' "GPU" "Apple $(sysctl -n machdep.cpu.brand_string 2>/dev/null) (Metal)"
     fi
 
+    # What this card can actually run -- answers "will it run on my
+    # GPU" on the board itself, rather than sending the reader to a
+    # table to match their card by name.
+    local tier="" rq="" rf="" rc=0
+    if [ -n "$PY" ]; then
+        while IFS='=' read -r k v; do
+            case "$k" in
+                TIER_LABEL) tier="$v" ;;
+                REC_FAMILY) rf="$v" ;;
+                REC_QUANT)  rq="$v" ;;
+                REC_CTX)    rc="$v" ;;
+            esac
+        done < <("$PY" "$ROOT/scripts/hardware.py" --recommend 2>/dev/null \
+                     | kiln_strip_cr || true)
+    fi
+    if [ -n "$tier" ] && [ -n "$rq" ]; then
+        printf '  %-14s %s\n' "profile" "$tier  runs $rf $rq at $((rc / 1024))K ctx"
+    elif [ -n "$tier" ]; then
+        printf '  %-14s %s\n' "profile" "$tier  nothing here fits"
+    fi
+
     printf ' %s\n' '------------------------------------------------------------'
     local found=0
     for f in ./models/Qwen3.8-27B-*.gguf; do
@@ -85,6 +115,14 @@ status() {
     for f in ./models/Huihui-Qwen3.8-27B-abliterated-*.gguf; do
         [ -e "$f" ] || continue
         printf '  %-14s %s\n' " abliterated" "$(basename "$f")"; found=1
+    done
+    for f in ./models/Qwen3.8-9B-*.gguf; do
+        [ -e "$f" ] || continue
+        printf '  %-14s %s\n' " 9B distill" "$(basename "$f")"; found=1
+    done
+    for f in ./models/Qwen3.8-4B-*.gguf; do
+        [ -e "$f" ] || continue
+        printf '  %-14s %s\n' " 4B distill" "$(basename "$f")"; found=1
     done
     [ "$found" = 0 ] && printf '  %-14s %s\n' "weights" "none         ./kiln.sh get"
 
@@ -121,9 +159,11 @@ usage() {
 
    status            what is installed, downloaded and running
    setup             llama.cpp, cloudflared and models/
-   get [base|ablit|both]
-                     download weights (default: base)
-   start [base|ablit]
+   hardware          what this GPU can run, and at what context
+   get [base|ablit|9b|4b|both]
+                     download weights; no argument takes the build
+                     this GPU is sized for
+   start [base|ablit|9b|4b]
                      serve a model to Cursor
    stop              stop llama-server and cloudflared
    key [show|rotate] the API key Cursor needs
@@ -152,16 +192,16 @@ case "$CMD" in
                 VARIANT=base  "$UNIX/download.sh" || exit $?
                 VARIANT=ablit exec "$UNIX/download.sh"
                 ;;
-            ablit|base) exec env VARIANT="$ARG" "$UNIX/download.sh" ;;
+            ablit|base|9b|4b) exec env VARIANT="$ARG" "$UNIX/download.sh" ;;
             "")         exec "$UNIX/download.sh" ;;
-            *)          echo "kiln: unknown variant '$ARG' (use base, ablit or both)" >&2; exit 1 ;;
+            *)          echo "kiln: unknown variant '$ARG' (use base, ablit, 9b, 4b or both)" >&2; exit 1 ;;
         esac
         ;;
     start)
         case "$ARG" in
-            ablit|base) exec env VARIANT="$ARG" "$START" ;;
+            ablit|base|9b|4b) exec env VARIANT="$ARG" "$START" ;;
             "")         exec "$START" ;;
-            *)          echo "kiln: unknown variant '$ARG' (use base or ablit)" >&2; exit 1 ;;
+            *)          echo "kiln: unknown variant '$ARG' (use base, ablit, 9b or 4b)" >&2; exit 1 ;;
         esac
         ;;
     stop)
@@ -178,6 +218,55 @@ case "$CMD" in
         echo "   $API_KEY"
         echo
         echo " Stored in api_key.txt, readable only by you."
+        echo
+        ;;
+    hardware|hw)
+        # Its own command rather than more rows on the board: this is
+        # the answer to "will it run on my GPU", and it is meant to be
+        # pasteable into a hardware report.
+        if [ -z "$PY" ]; then
+            echo "kiln: needs python3 to size a launch." >&2
+            exit 1
+        fi
+        echo
+        echo " This machine"
+        echo " ------------------------------------------------------------"
+        "$PY" "$ROOT/scripts/hardware.py" --detect | kiln_strip_cr |
+                while IFS='=' read -r k v; do
+            case "$k" in
+                GPU_NAME)   [ -n "$v" ] && printf '  %-11s %s\n' "GPU" "$v" ;;
+                VRAM_MIB)   printf '  %-11s %s MiB\n' "VRAM" "$v" ;;
+                CORES)      printf '  %-11s %s physical\n' "cores" "$v" ;;
+                RAM_MIB)    printf '  %-11s %s MiB\n' "RAM" "$v" ;;
+                TIER_LABEL) printf '  %-11s %s\n' "profile" "$v" ;;
+            esac
+        done
+        echo " ------------------------------------------------------------"
+        echo
+        echo " What it should run"
+        echo " ------------------------------------------------------------"
+        "$PY" "$ROOT/scripts/hardware.py" --recommend | kiln_strip_cr |
+                while IFS='=' read -r k v; do
+            case "$k" in
+                REC_LABEL)    printf '  %-11s %s\n' "model" "$v" ;;
+                REC_QUANT)    printf '  %-11s %s\n' "quant" "$v" ;;
+                REC_CTX)      printf '  %-11s %s tokens\n' "context" "$v" ;;
+                REC_MTP)      printf '  %-11s %s\n' "MTP head" "${v:-off}" ;;
+                REC_MMPROJ)   printf '  %-11s %s\n' "vision" "${v:-off}" ;;
+                REC_TOTAL_GB) printf '  %-11s ~%s GB\n' "download" "$v" ;;
+                REC_THIRD_PARTY)
+                    [ "$v" = 1 ] && printf '  %-11s %s\n' "note" \
+                        "third-party distill, not a Qwen release" ;;
+                REC_BELOW_MIN)
+                    [ "$v" = 1 ] && printf '  %-11s %s\n' "note" \
+                        "below the context kiln aims for; it will still load" ;;
+                REC_REASON)   printf '  %-11s %s\n' "no fit" "$v" ;;
+            esac
+        done
+        echo " ------------------------------------------------------------"
+        echo
+        echo " ./kiln.sh get   downloads exactly this"
+        echo " Set KILN_MIN_CTX to trade context against quant quality."
         echo
         ;;
     bench)    exec "$UNIX/benchmark.sh" ;;

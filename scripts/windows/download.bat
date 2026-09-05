@@ -3,21 +3,29 @@ setlocal enabledelayedexpansion
 cd /d "%~dp0..\.."
 
 :: ============================================================
-::  Download: Qwen3.8-27B  (released 2026-08-05)
+::  Download: Qwen3.8 weights, sized to the machine present.
 ::
-::  Takes the variant as argument 1 ("base" or "ablit") and asks
-::  if it is missing. launch.bat supplies it.
+::  Takes the variant as argument 1 ("base", "ablit", "9b",
+::  "4b") and asks if it is missing. launch.bat supplies it.
 ::
-::  Three separate files make up a full install:
+::  Up to three separate files make up a full install:
 ::    1. weights   -- per variant, see lib_variants.bat
 ::    2. MTP head  -- ggml-org/Qwen3.8-27B-GGUF  (speculative decoding)
-::    3. mmproj    -- unsloth/Qwen3.8-27B-GGUF   (vision encoder)
+::    3. mmproj    -- vision encoder
 ::
-::  Files 2 and 3 come from the same place for BOTH variants and
-::  are downloaded once. huihui-ai ablates the language layers of
-::  unsloth's own UD quants and states the MTP head and vision
-::  tower are left untouched, so the stock ones stay correct --
-::  the second variant costs ~21 GB, not ~25.
+::  Files 2 and 3 exist for the 27B variants only, come from the
+::  same place for BOTH of them, and are downloaded once.
+::  huihui-ai ablates the language layers of unsloth's own UD
+::  quants and states the MTP head and vision tower are left
+::  untouched, so the stock ones stay correct -- the second 27B
+::  variant costs ~21 GB, not ~25.
+::
+::  WHAT CHANGED: this used to offer five quants with hardcoded
+::  sizes and always default to UD-Q5_K_XL, which is right on a
+::  32 GB card and a guaranteed OOM on a 12 GB one. The menu is
+::  now built from scripts\hardware.py, which knows every quant
+::  in the repo, what each one weighs, and what context each
+::  would leave on THIS GPU. The default is whatever that says.
 ::
 ::  NOTE: Qwen3.8-27B has a 248,320-token vocab with UNTIED
 ::  embeddings -- the embed + output tensors alone are ~2.5B
@@ -25,89 +33,163 @@ cd /d "%~dp0..\.."
 ::  precision; plain Q4_K_M does not. Prefer the UD-*_XL files.
 :: ============================================================
 
-:: ---- which variant? ----------------------------------------
-set "WANT=%~1"
-if not defined WANT (
-    echo  Which build?
-    echo.
-    echo    [1] Qwen3.8-27B              stock Qwen release
-    echo    [2] Qwen3.8-27B abliterated  refusal behaviour removed
-    echo.
-    set /p VCHOICE="Enter choice [1-2] (default=1): "
-    if "!VCHOICE!"=="2" (set "WANT=ablit") else (set "WANT=base")
-)
-call "%~dp0lib_variants.bat" "%WANT%"
-if errorlevel 1 (
-    echo  ERROR: unknown variant "%WANT%" -- expected "base" or "ablit".
+call :find_python
+if not defined PY_EXE (
+    echo  ERROR: Python not found. Install Python 3.8+ from https://python.org
     pause & exit /b 1
 )
 
-set BASE_REPO=%V_REPO%
-set MTP_REPO=ggml-org/Qwen3.8-27B-GGUF
-set VISION_REPO=unsloth/Qwen3.8-27B-GGUF
+set "HW=%~dp0..\hardware.py"
+
+:: ---- what does this machine want? ---------------------------
+:: Done before anything is offered, so the menus can mark the
+:: recommendation rather than making the user work it out from a
+:: table in the README.
+set "PROBED=0"
+set "VRAM_MIB=0"
+set "TIER_LABEL="
+set "REC_FAMILY="
+set "REC_QUANT="
+for /f "usebackq tokens=1,* delims==" %%A in (`%PY_EXE% "%HW%" --recommend 2^>nul`) do set "%%A=%%B"
 
 echo ============================================================
-echo  Download: %V_LABEL%
-echo  Source: %BASE_REPO%
-echo  Target: RTX 5090 (32 GB VRAM)
+if "%PROBED%"=="1" (
+    echo  Detected: %GPU_NAME%  ^(%VRAM_MIB% MiB^)
+    echo  Tier    : %TIER_LABEL%
+) else (
+    echo  No GPU detected ^(is nvidia-smi on PATH?^).
+    echo  Sizes below are shown without a context estimate.
+)
 echo ============================================================
 echo.
-:: Same quant names in both repos, slightly different bytes on
-:: disk (huihui requantizes after ablating), so carry both size
-:: columns. Taken from the Hugging Face file listings on
-:: 2026-09-01; they drive the menu text and the free-space check.
-if "%V_ID%"=="ablit" (
-    set "SZ1=20.7" & set "SZ2=17.4" & set "SZ3=24.8" & set "SZ4=11.0" & set "SZ5=29.0"
-) else (
-    set "SZ1=20.9" & set "SZ2=17.6" & set "SZ3=25.3" & set "SZ4=10.9" & set "SZ5=29.0"
+
+:: ---- which variant? ----------------------------------------
+set "WANT=%~1"
+if defined WANT goto :have_variant
+
+:: Mark the recommended family so the default is visible rather
+:: than implied.
+set "M1= " & set "M2= " & set "M3= " & set "M4= "
+if "%REC_FAMILY%"=="base" set "M1=*"
+if "%REC_FAMILY%"=="ablit" set "M2=*"
+if "%REC_FAMILY%"=="9b"   set "M3=*"
+if "%REC_FAMILY%"=="4b"   set "M4=*"
+
+echo  Which build?
+echo.
+echo   %M1% [1] Qwen3.8-27B              stock Qwen release
+echo   %M2% [2] Qwen3.8-27B abliterated  refusal behaviour removed
+echo   %M3% [3] Qwen3.8-9B distill       third-party, text-only
+echo   %M4% [4] Qwen3.8-4B distill       third-party, text-only
+echo.
+echo      * = fits this machine best
+echo.
+echo   3 and 4 are Empero's distillations of Qwen3.8-2.4T-A95B into
+echo   the smaller Qwen3.5 architectures. They are NOT Qwen releases
+echo   and have no MTP head and no vision tower, but they beat a 27B
+echo   crushed into 2 bits on a small card.
+echo.
+set "VCHOICE="
+set /p VCHOICE="Enter choice [1-4] (default=recommended): "
+if not defined VCHOICE (
+    set "WANT=%REC_FAMILY%"
+    if not defined WANT set "WANT=base"
+)
+if "!VCHOICE!"=="1" set "WANT=base"
+if "!VCHOICE!"=="2" set "WANT=ablit"
+if "!VCHOICE!"=="3" set "WANT=9b"
+if "!VCHOICE!"=="4" set "WANT=4b"
+
+:have_variant
+call "%~dp0lib_variants.bat" "%WANT%"
+if errorlevel 1 (
+    echo  ERROR: unknown variant "%WANT%" -- expected base, ablit, 9b or 4b.
+    pause & exit /b 1
 )
 
+echo.
+echo ============================================================
+echo  Download: %V_LABEL%
+echo  Source: %V_REPO%
+echo ============================================================
+echo.
+
+:: ---- quant menu, built from the registry -------------------
+:: Sizes and context estimates both come from hardware.py, so the
+:: number shown here and the number the free-space check uses
+:: cannot drift apart.
+set "N=0"
+set "DEFN="
 echo  Weight quant options:
 echo.
-echo    [1] UD-Q5_K_XL   !SZ1! GB  recommended -- best quality that
-echo                              still leaves room for MTP + 131K ctx
-echo    [2] UD-Q4_K_XL   !SZ2! GB  more headroom -- reaches ~200K ctx
-echo    [3] UD-Q6_K_XL   !SZ3! GB  highest quality, but NO room for
-echo                              the MTP head (loses the speedup)
-echo    [4] UD-IQ3_XXS   !SZ4! GB  small; noticeably weaker on agentic
-echo                              tool-calling -- not recommended
-echo    [5] Q8_0         !SZ5! GB  near-lossless reference for benchmarking
+for /f "usebackq tokens=1-7 delims=|" %%A in (`%PY_EXE% "%HW%" --quants "%V_ID%" 2^>nul`) do (
+    set /a N+=1
+    set "Q_!N!=%%A"
+    set "G_!N!=%%B"
+    set "MARK= "
+    if "%%G"=="1" ( set "MARK=*" & set "DEFN=!N!" )
+    if "%%F"=="0" (
+        set "NOTE=does not fit this GPU"
+    ) else (
+        set /a KCTX=%%C/1024
+        set "NOTE=!KCTX!K ctx, MTP %%D, vision %%E"
+    )
+    echo    !MARK! [!N!] %%A   %%B GB   !NOTE!
+)
+
+if "%N%"=="0" (
+    echo  ERROR: could not read the quant list from hardware.py.
+    pause & exit /b 1
+)
 echo.
-set /p CHOICE="Enter choice [1-5] (default=1): "
-if "%CHOICE%"=="" set CHOICE=1
+echo      * = recommended for this machine
+echo.
+set "CHOICE="
+set /p CHOICE="Enter choice [1-%N%] (default=%DEFN%): "
+if not defined CHOICE set "CHOICE=%DEFN%"
+if not defined CHOICE set "CHOICE=1"
 
-:: The parentheses are load-bearing: "if COND a & b" runs b
-:: unconditionally, so an unbracketed second set here would leave
-:: SIZE holding the last line's value whatever you picked.
-if "%CHOICE%"=="1" ( set "QUANT=UD-Q5_K_XL" & set "SIZE=!SZ1!" )
-if "%CHOICE%"=="2" ( set "QUANT=UD-Q4_K_XL" & set "SIZE=!SZ2!" )
-if "%CHOICE%"=="3" ( set "QUANT=UD-Q6_K_XL" & set "SIZE=!SZ3!" )
-if "%CHOICE%"=="4" ( set "QUANT=UD-IQ3_XXS" & set "SIZE=!SZ4!" )
-if "%CHOICE%"=="5" ( set "QUANT=Q8_0"       & set "SIZE=!SZ5!" )
-
+:: Validate before indexing: an out-of-range pick would silently
+:: leave QUANT empty and download a file named "-.gguf".
+set "QUANT=!Q_%CHOICE%!"
+set "SIZE=!G_%CHOICE%!"
 if not defined QUANT (
     echo  Invalid choice.
     pause & exit /b 1
 )
-set "FILE=%V_PREFIX%-%QUANT%.gguf"
 
-:: ---- MTP head sizing ----
-:: Q8_0 head (3.2 GB) is the quality pick. With a Q6_K_XL base
-:: there is no VRAM left for it at all.
-set "MTP_FILE=mtp-Qwen3.8-27B-Q8_0.gguf"
-set "MTP_SIZE=3.2"
-if "%CHOICE%"=="3" (
-    set "MTP_FILE="
-    echo.
-    echo  NOTE: UD-Q6_K_XL leaves no VRAM for the MTP head, so it
-    echo        will not be downloaded. Generation will be slower.
-)
+:: ---- resolve the full plan for that exact quant -------------
+:: Gives back the MTP head and mmproj precision that fit alongside
+:: it. On a 24 GB card that is the q4_0 head rather than q8_0 --
+:: 1.4 GB smaller, and the difference between keeping speculative
+:: decoding and losing it.
+set "REC_MTP_FILE="
+set "REC_MMPROJ_FILE="
+set "REC_MTP_REPO="
+set "REC_MMPROJ_REPO="
+set "REC_CTX=0"
+set "REC_TOTAL_GB=%SIZE%"
+set "REC_BELOW_MIN=0"
+for /f "usebackq tokens=1,* delims==" %%A in (`%PY_EXE% "%HW%" --recommend --family "%V_ID%" --quant "%QUANT%" 2^>nul`) do set "%%A=%%B"
+
+set "FILE=%V_PREFIX%-%QUANT%.gguf"
 
 echo.
 echo  Will download:
 echo    weights : %FILE%  (~%SIZE% GB)
-if defined MTP_FILE echo    MTP head: %MTP_FILE%  (~%MTP_SIZE% GB)
-echo    vision  : mmproj-F16.gguf  (~0.93 GB)
+if defined REC_MTP_FILE    echo    MTP head: %REC_MTP_FILE%
+if defined REC_MMPROJ_FILE echo    vision  : %REC_MMPROJ_FILE%
+if "%PROBED%"=="1" (
+    set /a SHOWCTX=%REC_CTX%/1024
+    echo.
+    echo    context : !SHOWCTX!K tokens on this GPU
+)
+if "%REC_BELOW_MIN%"=="1" (
+    echo.
+    echo  [WARN] this leaves less context than agentic coding really
+    echo         wants. A smaller quant, or one of the distill builds,
+    echo         would give you a much larger window.
+)
 echo.
 
 :: ---- free space check ----
@@ -115,7 +197,7 @@ for /f "usebackq delims=" %%F in (`powershell -NoProfile -Command ^
     "[math]::Round((Get-PSDrive C).Free/1GB,1)"`) do set FREE=%%F
 echo  Free space on C: : %FREE% GB
 for /f "usebackq delims=" %%N in (`powershell -NoProfile -Command ^
-    "[math]::Round(%SIZE% + 0.93 + $(if('%MTP_FILE%' -ne ''){%MTP_SIZE%}else{0}) + 5, 1)"`) do set NEEDED=%%N
+    "[math]::Round(%REC_TOTAL_GB% + 5, 1)"`) do set NEEDED=%%N
 echo  Recommended free  : %NEEDED% GB  (includes 5 GB working margin)
 echo.
 powershell -NoProfile -Command "if ((Get-PSDrive C).Free/1GB -lt %NEEDED%) { exit 1 } else { exit 0 }"
@@ -126,35 +208,23 @@ if errorlevel 1 (
     if /I not "!GOON!"=="y" exit /b 1
 )
 
-:: ---- python ----
-python --version >nul 2>&1
-if errorlevel 1 (
-    python3 --version >nul 2>&1
-    if errorlevel 1 (
-        echo  ERROR: Python not found. Install Python 3.8+ from https://python.org
-        pause & exit /b 1
-    )
-    set PYTHON=python3
-) else (
-    set PYTHON=python
-)
-
 echo  Installing/upgrading huggingface_hub...
-%PYTHON% -m pip install -q "huggingface_hub>=0.22" "hf_transfer"
+%PY_EXE% -m pip install -q "huggingface_hub>=0.22" "hf_transfer"
 
 :: hf_transfer gives a large speedup on multi-GB files over fast links.
 set HF_HUB_ENABLE_HF_TRANSFER=1
 
 if not exist "models" mkdir "models"
 
-call :fetch "%BASE_REPO%" "%FILE%"
+call :fetch "%V_REPO%" "%FILE%"
 if errorlevel 1 goto failed
 
-call :fetch "%VISION_REPO%" "mmproj-F16.gguf"
-if errorlevel 1 goto failed
-
-if defined MTP_FILE (
-    call :fetch "%MTP_REPO%" "%MTP_FILE%"
+if defined REC_MMPROJ_FILE (
+    call :fetch "%REC_MMPROJ_REPO%" "%REC_MMPROJ_FILE%"
+    if errorlevel 1 goto failed
+)
+if defined REC_MTP_FILE (
+    call :fetch "%REC_MTP_REPO%" "%REC_MTP_FILE%"
     if errorlevel 1 goto failed
 )
 
@@ -166,8 +236,9 @@ echo  Launch it with:
 echo      launch.bat            ^(picks between installed builds^)
 echo  or  kiln start %V_ID%
 echo.
-echo  The start script finds the quant on its own -- nothing to
-echo  edit if you did not take the default.
+echo  The start script finds the quant on its own and sizes the
+echo  context to this GPU -- nothing to edit if you did not take
+echo  the default.
 echo ============================================================
 pause
 exit /b 0
@@ -192,6 +263,24 @@ echo  [*] Downloading %TARGET% from %REPO% ...
 :: No %-formatting in this one-liner: cmd.exe pairs up percent
 :: signs across the whole line, so a Python '%' operator sitting
 :: alongside %REPO% / %TARGET% gets eaten during expansion.
-%PYTHON% -c "from huggingface_hub import hf_hub_download; import os; p=hf_hub_download(repo_id='%REPO%', filename='%TARGET%', local_dir='models'); print('    saved:', p, '(' + str(round(os.path.getsize(p)/1e9, 1)) + ' GB)')"
+%PY_EXE% -c "from huggingface_hub import hf_hub_download; import os; p=hf_hub_download(repo_id='%REPO%', filename='%TARGET%', local_dir='models'); print('    saved:', p, '(' + str(round(os.path.getsize(p)/1e9, 1)) + ' GB)')"
 if errorlevel 1 exit /b 1
+exit /b 0
+
+:: ------------------------------------------------------------
+:: Sets PY_EXE, or leaves it undefined. "python" on a stock
+:: Windows can be the App Execution Alias stub that opens the
+:: Store and prints nothing, so check it actually answers.
+::
+:: NOTE for every for/f below: %PY_EXE% is used UNQUOTED inside
+:: the backquotes. cmd re-parses that command line, and a quoted
+:: program name followed by further quoted arguments breaks the
+:: re-parse silently -- no error, no output.
+:find_python
+set "PY_EXE="
+for %%P in (python python3 py) do (
+    if not defined PY_EXE (
+        %%P -c "import sys" >nul 2>&1 && set "PY_EXE=%%P"
+    )
+)
 exit /b 0

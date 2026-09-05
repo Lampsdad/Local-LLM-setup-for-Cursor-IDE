@@ -6,12 +6,15 @@ export PATH="${HOME}/.local/bin:${PATH}"
 
 # VARIANT=base (stock) or VARIANT=ablit (abliterated).
 # Both share the MTP head and the vision projector below.
-. "$SCRIPT_DIR/lib_variants.sh"
+# With no VARIANT set, resolve it from what is on disk -- see the
+# KILN_PICK block in lib_variants.sh.
+KILN_PICK=disk . "$SCRIPT_DIR/lib_variants.sh"
 
-QUANT="${QUANT:-UD-Q5_K_XL}"
-MODEL="./models/${V_PREFIX}-${QUANT}.gguf"
-MMPROJ="./models/mmproj-F16.gguf"
-MTP="./models/mtp-Qwen3.8-27B-Q8_0.gguf"
+# Resolves MODEL / MTP / MMPROJ / FIT_ARGS against the weights
+# actually on disk and the GPU actually present. QUANT= still
+# overrides the choice of file.
+echo "  build   : ${V_LABEL}"
+. "$SCRIPT_DIR/lib_select.sh"
 BINARY="./llama-bin/llama-server"
 PORT=8081
 LOG="./server.log"
@@ -37,7 +40,7 @@ fi
 # (2026-05-16). Older builds reject --spec-type draft-mtp, so
 # probe for it rather than assuming.
 EXTRA=()
-if [ -f "$MTP" ] && "$BINARY" --help 2>&1 | grep -q 'draft-mtp'; then
+if [ -n "$MTP" ] && "$BINARY" --help 2>&1 | grep -q 'draft-mtp'; then
     EXTRA+=(--spec-type draft-mtp
             --spec-draft-model "$MTP"
             --spec-draft-ngl 99
@@ -46,7 +49,7 @@ if [ -f "$MTP" ] && "$BINARY" --help 2>&1 | grep -q 'draft-mtp'; then
 else
     echo "MTP speculative decoding: unavailable (need llama.cpp b9180+ and $MTP)"
 fi
-if [ -f "$MMPROJ" ]; then
+if [ -n "$MMPROJ" ]; then
     EXTRA+=(--mmproj "$MMPROJ")
     echo "Vision: enabled"
 fi
@@ -58,15 +61,16 @@ sleep 1
 
 # ── start llama-server ───────────────────────────────────────
 echo "Starting llama-server..."
-# --fit on lets llama.cpp size any argument we leave unset to the
-# GPU actually present, so --ctx-size is deliberately omitted here
-# (this script runs on several different machines).
+# FIT_ARGS is either an explicit --ctx-size computed by
+# scripts/hardware.py for the GPU present, or --fit on when there
+# was nothing to compute from. Either way this script runs
+# unmodified on machines with very different cards.
 # q8_0 KV, not q4_0: 48 of Qwen3.8's 64 layers are recurrent, and
 # quantization error accumulates along the sequence in those rather
 # than being re-anchored each token.
 "$BINARY" \
     --model        "$MODEL" \
-    --fit          on \
+    "${FIT_ARGS[@]}" \
     --n-gpu-layers 99 \
     --flash-attn   auto \
     --cache-type-k q8_0 \

@@ -13,6 +13,7 @@ call "%~dp0lib_ui.bat"
 ::    kiln start [base|ablit]
 ::    kiln stop            stop server and tunnel
 ::    kiln key [show|rotate|set <key>]
+::    kiln hardware        what this machine can run
 ::    kiln update          upgrade llama.cpp
 ::    kiln bench | clean | help
 ::
@@ -39,6 +40,8 @@ if /I "%CMD%"=="run"      goto :cmd_start
 if /I "%CMD%"=="stop"     goto :cmd_stop
 if /I "%CMD%"=="key"      goto :cmd_key
 if /I "%CMD%"=="update"   goto :cmd_update
+if /I "%CMD%"=="hardware" goto :cmd_hardware
+if /I "%CMD%"=="hw"       goto :cmd_hardware
 if /I "%CMD%"=="bench"    goto :cmd_bench
 if /I "%CMD%"=="clean"    goto :cmd_clean
 if /I "%CMD%"=="help"     goto :cmd_help
@@ -79,10 +82,13 @@ call :row "llama.cpp"    "%ST_BIN_S%"
 call :row "MTP support"  "%ST_MTP_S%"
 call :row "cloudflared"  "%ST_CF_S%"
 call :row "GPU"          "%ST_GPU_S%"
+call :row "profile"      "%ST_TIER_S%"
 call :row "disk free"    "%ST_FREE_S%"
 call :rule
 call :row "Qwen3.8-27B"  "%ST_BASE_S%"
 call :row " abliterated" "%ST_ABL_S%"
+call :row " 9B distill"  "%ST_9B_S%"
+call :row " 4B distill"  "%ST_4B_S%"
 call :row "shared files" "%ST_SHARED_S%"
 call :rule
 call :row "server"       "%ST_RUN_S%"
@@ -151,20 +157,56 @@ set "ST_GPU_S=%C_WARN%nvidia-smi not found%C_0%"
 :: bare form reaches nvidia-smi as two options it does not know.
 for /f "usebackq delims=" %%G in (`nvidia-smi "--query-gpu=name,memory.total" "--format=csv,noheader" 2^>nul`) do set "ST_GPU_S=%C_HL%%%G%C_0%"
 
+:: ---- hardware profile ----
+:: What this card can actually run, so the board answers the
+:: first question a new user has without them going to the README
+:: and comparing GPU names by hand.
+set "ST_TIER_S=%C_MU%unknown%C_0%"
+set "REC_FAMILY="
+set "REC_QUANT="
+set "REC_CTX=0"
+set "TIER_LABEL="
+call :find_python
+if defined PY_EXE for /f "usebackq tokens=1,* delims==" %%A in (`%PY_EXE% "%~dp0..\hardware.py" --recommend 2^>nul`) do set "%%A=%%B"
+if defined TIER_LABEL (
+    if defined REC_QUANT (
+        set /a TIER_KCTX=!REC_CTX!/1024
+        rem NO ">" in this value, escaped or not. :row passes it
+        rem through %~2, and percent-expansion runs BEFORE cmd parses
+        rem redirection -- so a ">" that arrives that way redirects
+        rem the row into a file and the line silently disappears from
+        rem the board. (Delayed expansion is safe for the same reason
+        rem it is late: !var! is substituted after that parse.)
+        set "ST_TIER_S=%C_HL%!TIER_LABEL!%C_0%  %C_MU%runs !REC_FAMILY! !REC_QUANT! at !TIER_KCTX!K ctx%C_0%"
+    ) else (
+        set "ST_TIER_S=%C_HL%!TIER_LABEL!%C_0%  %C_WARN%nothing here fits%C_0%"
+    )
+)
+
 :: ---- disk ----
 set "ST_FREE_S=%C_MU%unknown%C_0%"
 for /f "usebackq delims=" %%F in (`powershell -NoProfile -Command "[math]::Round((Get-PSDrive C).Free/1GB,0)"`) do set "ST_FREE_S=%C_HL%%%F GB%C_0%"
 
 :: ---- weights ----
-call :probe "Qwen3.8-27B"                    Q_BASE
-call :probe "Huihui-Qwen3.8-27B-abliterated" Q_ABL
+call :probe base  Q_BASE
+call :probe ablit Q_ABL
+call :probe 9b    Q_9B
+call :probe 4b    Q_4B
 if defined Q_BASE (set "ST_BASE_S=%C_OK%!Q_BASE!%C_0%") else (set "ST_BASE_S=%C_MU%not downloaded%C_0%")
 if defined Q_ABL  (set "ST_ABL_S=%C_OK%!Q_ABL!%C_0%")  else (set "ST_ABL_S=%C_MU%not downloaded%C_0%")
+if defined Q_9B   (set "ST_9B_S=%C_OK%!Q_9B!%C_0%")    else (set "ST_9B_S=%C_MU%not downloaded%C_0%")
+if defined Q_4B   (set "ST_4B_S=%C_OK%!Q_4B!%C_0%")    else (set "ST_4B_S=%C_MU%not downloaded%C_0%")
 
 :: Both builds share these two, so they are their own row rather
 :: than being counted against either one.
-if exist "models\mtp-Qwen3.8-27B-Q8_0.gguf" (set "ST_SHARED_S=%C_OK%MTP head%C_0%") else (set "ST_SHARED_S=%C_MU%no MTP head%C_0%")
-if exist "models\mmproj-F16.gguf" (set "ST_SHARED_S=!ST_SHARED_S!   %C_OK%vision%C_0%") else (set "ST_SHARED_S=!ST_SHARED_S!   %C_MU%no vision%C_0%")
+:: Wildcards, not exact names: the MTP head ships as Q8_0 or
+:: Q4_0 and the projector as F16 or Q8_0, and kiln downloads
+:: whichever the card had room for. Matching only the large ones
+:: reported "no MTP head" on exactly the 24 GB machines that were
+:: correctly given the small one.
+set "ST_SHARED_S=%C_MU%no MTP head%C_0%"
+if exist "models\mtp-Qwen3.8-27B-*.gguf" set "ST_SHARED_S=%C_OK%MTP head%C_0%"
+if exist "models\mmproj-*.gguf" (set "ST_SHARED_S=!ST_SHARED_S!   %C_OK%vision%C_0%") else (set "ST_SHARED_S=!ST_SHARED_S!   %C_MU%no vision%C_0%")
 
 :: ---- server ----
 set "ST_RUN=0"
@@ -194,17 +236,38 @@ if "%ST_RUN%"=="1" if exist "%CF_LOG%" (
 :: the step that unblocks the rest.
 if "%ST_BIN%"=="0" set "ST_NEXT=%C_AC%kiln setup%C_0%    install llama.cpp and cloudflared"
 if not defined ST_NEXT if "%ST_MTP%"=="0" set "ST_NEXT=%C_AC%kiln update%C_0%   upgrade llama.cpp for MTP speculative decoding"
-if not defined ST_NEXT if not defined Q_BASE if not defined Q_ABL set "ST_NEXT=%C_AC%kiln get both%C_0% download the weights"
+if not defined ST_NEXT if not defined Q_BASE if not defined Q_ABL if not defined Q_9B if not defined Q_4B set "ST_NEXT=%C_AC%kiln get%C_0%      download the weights kiln hardware recommends"
 if not defined ST_NEXT if "%ST_RUN%"=="0" set "ST_NEXT=%C_AC%kiln start%C_0%    serve a model to Cursor"
 exit /b 0
 
-:: :probe <filename prefix> <out var>
-:: Best quant present, in the same order start.bat
-:: picks, so the board names the file that would actually load.
+:: :probe <variant id> <out var>
+:: Best quant present, in the same order start.bat picks, so the
+:: board names the file that would actually load. The ladder comes
+:: from the registry rather than being spelled out here.
+::
+:: setlocal so probing one variant does not clobber the V_* of
+:: another -- the board probes several in a row.
 :probe
-set "%~2="
-for %%Q in (UD-Q5_K_XL UD-Q4_K_XL UD-Q6_K_XL Q8_0 UD-IQ3_XXS) do (
-    if not defined %~2 if exist "models\%~1-%%Q.gguf" set "%~2=%%Q"
+setlocal
+call "%~dp0lib_variants.bat" "%~1" >nul 2>&1
+set "FOUND="
+for %%Q in (%V_QUANTS%) do (
+    if not defined FOUND if exist "models\%V_PREFIX%-%%Q.gguf" set "FOUND=%%Q"
+)
+endlocal & set "%~2=%FOUND%"
+exit /b 0
+
+:: ------------------------------------------------------------
+:: Sets PY_EXE, or leaves it undefined. %PY_EXE% must be used
+:: UNQUOTED inside a for/f backquote: cmd re-parses that command
+:: line, and a quoted program name followed by further quoted
+:: arguments breaks the re-parse silently.
+:find_python
+set "PY_EXE="
+for %%P in (python python3 py) do (
+    if not defined PY_EXE (
+        %%P -c "import sys" >nul 2>&1 && set "PY_EXE=%%P"
+    )
 )
 exit /b 0
 
@@ -218,6 +281,7 @@ echo   %C_HL%2%C_0%  download a model    %C_MU%kiln get%C_0%
 echo   %C_HL%3%C_0%  stop the server     %C_MU%kiln stop%C_0%
 echo   %C_HL%4%C_0%  show the API key    %C_MU%kiln key show%C_0%
 echo   %C_HL%5%C_0%  install or update   %C_MU%kiln setup, kiln update%C_0%
+echo   %C_HL%6%C_0%  what fits this GPU  %C_MU%kiln hardware%C_0%
 echo   %C_HL%Q%C_0%  quit
 echo.
 set "SEL="
@@ -229,6 +293,7 @@ if "%SEL%"=="2" goto :cmd_get
 if "%SEL%"=="3" goto :cmd_stop
 if "%SEL%"=="4" goto :menu_key
 if "%SEL%"=="5" goto :cmd_setup
+if "%SEL%"=="6" goto :cmd_hardware
 echo  %C_ERR%Not a choice.%C_0%
 echo.
 goto :menu
@@ -335,6 +400,63 @@ echo   %C_WARN%Restart the server to load it.%C_0%
 echo.
 exit /b 0
 
+:cmd_hardware
+:: Full readout: what is in the machine, and what it should run.
+:: Deliberately its own command rather than more rows on the board
+:: -- this is the answer to "will it run on my GPU", and it should
+:: be quotable into a hardware report.
+call :banner
+call :find_python
+if not defined PY_EXE (
+    echo  %C_ERR%Python not found.%C_0% kiln needs it to size a launch.
+    echo  Install Python 3.8+ from https://python.org
+    exit /b 1
+)
+echo  %C_HL%This machine%C_0%
+call :rule
+for /f "usebackq tokens=1,* delims==" %%A in (`%PY_EXE% "%~dp0..\hardware.py" --detect 2^>nul`) do call :hwrow "%%A" "%%B"
+call :rule
+echo.
+echo  %C_HL%What it should run%C_0%
+call :rule
+for /f "usebackq tokens=1,* delims==" %%A in (`%PY_EXE% "%~dp0..\hardware.py" --recommend 2^>nul`) do call :recrow "%%A" "%%B"
+call :rule
+echo.
+echo  %C_MU%kiln get   downloads exactly this%C_0%
+echo  %C_MU%Set KILN_MIN_CTX to trade context against quant quality.%C_0%
+echo.
+exit /b 0
+
+:: :hwrow <key> <value> -- print the keys worth showing, skip the
+:: plumbing. A whitelist rather than a blacklist so a new field in
+:: hardware.py cannot quietly start printing here.
+:hwrow
+set "K=%~1"
+set "V=%~2"
+if "%K%"=="GPU_NAME"       echo   %C_MU%GPU        %C_0% %C_HL%%V%%C_0%
+if "%K%"=="VRAM_MIB"       echo   %C_MU%VRAM       %C_0% %V% MiB
+if "%K%"=="CORES"          echo   %C_MU%cores      %C_0% %V% physical
+if "%K%"=="RAM_MIB"        echo   %C_MU%RAM        %C_0% %V% MiB
+if "%K%"=="TIER_LABEL"     echo   %C_MU%profile    %C_0% %C_HL%%V%%C_0%
+exit /b 0
+
+:: :recrow <key> <value> -- the recommendation half. Separate from
+:: :hwrow so the second block does not reprint the machine facts
+:: the first block just listed.
+:recrow
+set "K=%~1"
+set "V=%~2"
+if "%K%"=="REC_LABEL"      echo   %C_MU%model      %C_0% %C_HL%%V%%C_0%
+if "%K%"=="REC_QUANT"      echo   %C_MU%quant      %C_0% %C_OK%%V%%C_0%
+if "%K%"=="REC_CTX"        echo   %C_MU%context    %C_0% %V% tokens
+if "%K%"=="REC_MTP"        echo   %C_MU%MTP head   %C_0% %V%
+if "%K%"=="REC_MMPROJ"     echo   %C_MU%vision     %C_0% %V%
+if "%K%"=="REC_TOTAL_GB"   echo   %C_MU%download   %C_0% ~%V% GB
+if "%K%"=="REC_THIRD_PARTY" if "%V%"=="1" echo   %C_WARN%note       %C_0% third-party distill, not a Qwen release
+if "%K%"=="REC_BELOW_MIN"  if "%V%"=="1" echo   %C_WARN%note       %C_0% below the context kiln aims for; it will still load
+if "%K%"=="REC_REASON"     echo   %C_ERR%no fit     %C_0% %V%
+exit /b 0
+
 :cmd_bench
 call "%~dp0benchmark.bat"
 exit /b %errorlevel%
@@ -356,10 +478,13 @@ echo.
 echo   %C_AC%status%C_0%                  what is installed, downloaded and running
 echo   %C_AC%setup%C_0%                   one-time: llama.cpp, cloudflared, models\
 echo   %C_AC%update%C_0%                  upgrade llama.cpp, needed for MTP
-echo   %C_AC%get%C_0%   [base^|ablit^|both]  download weights
-echo   %C_AC%start%C_0% [base^|ablit]       serve a model; no argument opens the picker
+echo   %C_AC%get%C_0%   [base^|ablit^|9b^|4b^|both]
+echo                           download weights; no argument takes the
+echo                           build this GPU is sized for
+echo   %C_AC%start%C_0% [base^|ablit^|9b^|4b] serve a model; no argument opens the picker
 echo   %C_AC%stop%C_0%                    stop the server and the tunnel
 echo   %C_AC%key%C_0%   [show^|rotate^|set] manage the API key
+echo   %C_AC%hardware%C_0%                what this GPU can run, and at what context
 echo   %C_AC%bench%C_0%                   quant speed and throughput sweep
 echo   %C_AC%clean%C_0%                   reclaim disk from superseded GGUFs
 echo.

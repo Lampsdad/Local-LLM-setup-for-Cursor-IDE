@@ -16,12 +16,12 @@ cd "${HOME}/research/Local-LLM-setup-for-cursor"
 
 PORT=8081
 # VARIANT=base (stock) or VARIANT=ablit (abliterated).
-. ./scripts/unix/lib_variants.sh
+KILN_PICK=disk . ./scripts/unix/lib_variants.sh
 
-QUANT="${QUANT:-UD-Q5_K_XL}"
-MODEL="./models/${V_PREFIX}-${QUANT}.gguf"
-MMPROJ="./models/mmproj-F16.gguf"
-MTP="./models/mtp-Qwen3.8-27B-Q8_0.gguf"
+# Resolves MODEL / MTP / MMPROJ / FIT_ARGS against what is on
+# disk and the GPU the scheduler actually gave us -- which on a
+# shared cluster is not always the card the job asked for.
+. ./scripts/unix/lib_select.sh
 BINARY="./llama-bin/llama-server"
 LOG="./server.log"
 CF_LOG="./cloudflared.log"
@@ -32,20 +32,24 @@ pkill -x cloudflared 2>/dev/null || true
 # optional here — anyone who can reach the node can reach the API.
 . ./scripts/unix/lib_api_key.sh
 
-# This job requests a single RTX 5090 (32 GB), so the sizing below
-# matches scripts/windows/start.bat: UD-Q5_K_XL weights + MTP head +
-# vision leave room for 131K of q8_0 KV.
+# The job requests a single RTX 5090 (32 GB), but lib_select.sh
+# sizes against whatever was allocated rather than trusting that.
 EXTRA=()
-if [ -f "$MTP" ] && "$BINARY" --help 2>&1 | grep -q 'draft-mtp'; then
+if [ -n "$MTP" ] && "$BINARY" --help 2>&1 | grep -q 'draft-mtp'; then
     EXTRA+=(--spec-type draft-mtp --spec-draft-model "$MTP" \
             --spec-draft-ngl 99 --spec-draft-n-max 3)
 fi
-[ -f "$MMPROJ" ] && EXTRA+=(--mmproj "$MMPROJ")
+# Plain if: this script runs under set -e, so a failing
+# `[ -f x ] && ...` would abort the job before the server
+# ever started, leaving nothing but a zero-length log.
+if [ -n "$MMPROJ" ]; then
+    EXTRA+=(--mmproj "$MMPROJ")
+fi
 
 exec "$BINARY" \
   --model "$MODEL" \
   --n-gpu-layers 99 \
-  --ctx-size 131072 \
+  "${FIT_ARGS[@]}" \
   --flash-attn auto \
   --cache-type-k q8_0 \
   --cache-type-v q8_0 \
