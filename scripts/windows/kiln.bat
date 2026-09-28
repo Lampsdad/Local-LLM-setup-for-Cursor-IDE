@@ -339,7 +339,7 @@ exit /b %errorlevel%
 
 :cmd_start
 if defined ARG (
-    call "%~dp0start.bat" "%ARG%"
+    call "%~dp0start.bat" "%ARG%" "%ARG2%"
     exit /b %errorlevel%
 )
 call "%~dp0launch.bat"
@@ -482,6 +482,8 @@ echo   %C_AC%get%C_0%   [base^|ablit^|9b^|4b^|both]
 echo                           download weights; no argument takes the
 echo                           build this GPU is sized for
 echo   %C_AC%start%C_0% [base^|ablit^|9b^|4b] serve a model; no argument opens the picker
+echo                           add %C_AC%--no-mtp%C_0% to trade the draft head for
+echo                           208K context instead of 119K ^(slower generation^)
 echo   %C_AC%stop%C_0%                    stop the server and the tunnel
 echo   %C_AC%key%C_0%   [show^|rotate^|set] manage the API key
 echo   %C_AC%hardware%C_0%                what this GPU can run, and at what context

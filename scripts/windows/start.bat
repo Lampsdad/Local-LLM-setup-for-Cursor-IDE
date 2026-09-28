@@ -30,10 +30,40 @@ call "%~dp0lib_ui.bat"
 ::      model. This is the single biggest generation speedup.
 :: ============================================================
 
-:: ---- which variant? ----------------------------------------
-:: An explicit argument wins. With none, run whichever variant is
+:: ---- arguments ---------------------------------------------
+:: An explicit variant wins. With none, run whichever variant is
 :: actually on disk, preferring the stock one when both are.
-set "WANT=%~1"
+::
+:: --no-mtp trades the MTP draft head for context. The head costs
+:: ~2.9 GB of VRAM, which on a 32 GB card is ~90,000 tokens of KV
+:: cache: 118,784 ctx with it against 208,896 without. Generation
+:: is roughly 1.5-2x slower without it, so this is the right trade
+:: only when the window matters more than tok/s -- the usual case
+:: for a Cursor agent loop.
+::
+:: Test %1 UNQUOTED, not %~1: kiln.bat forwards a fixed number of
+:: slots and passes "" for those the user omitted. A genuinely
+:: absent argument ends the loop; an empty quoted one must be
+:: skipped instead, or `kiln start --no-mtp` with no variant would
+:: stop parsing on the first slot and silently keep the MTP head.
+set "NO_MTP=0"
+set "WANT="
+:parse_args
+if "%1"=="" goto args_done
+if /I "%~1"=="--no-mtp" (
+    set "NO_MTP=1"
+) else (
+    if not "%~1"=="" if not defined WANT set "WANT=%~1"
+)
+:: shift /1, NEVER a bare shift: a bare shift renumbers %0 as well,
+:: so every later %~dp0 in this script resolves to the directory of
+:: the first ARGUMENT instead of the script. The failure is remote
+:: from the cause -- lib_variants.bat is looked up in the repo root
+:: and the script reports `unknown variant "ablit"`. /1 starts the
+:: shift at %1 and leaves %0 alone.
+shift /1
+goto parse_args
+:args_done
 if not defined WANT call :autopick_variant
 call "%~dp0lib_variants.bat" "%WANT%"
 if errorlevel 1 (
@@ -84,6 +114,11 @@ if "%V_MTP%"=="1" (
     if exist "models\mtp-Qwen3.8-27B-Q8_0.gguf" set "MTP=models\mtp-Qwen3.8-27B-Q8_0.gguf"
     if not defined MTP if exist "models\mtp-Qwen3.8-27B-Q4_0.gguf" set "MTP=models\mtp-Qwen3.8-27B-Q4_0.gguf"
 )
+
+:: --no-mtp: clear the head so USE_MTP stays 0 AND hardware.py is
+:: probed without it. The probe is what raises the context ceiling
+:: -- it converts the freed VRAM straight into KV cache.
+if "!NO_MTP!"=="1" set "MTP="
 if "%V_VISION%"=="1" (
     if exist "models\mmproj-F16.gguf" set "MMPROJ=models\mmproj-F16.gguf"
     if not defined MMPROJ if exist "models\mmproj-Qwen3.8-27B-Q8_0.gguf" set "MMPROJ=models\mmproj-Qwen3.8-27B-Q8_0.gguf"
@@ -305,7 +340,12 @@ set /a TRIES=0
 call :sleep 5
 set /a TRIES+=1
 set /a ELAPSED=TRIES*5
-findstr /C:"server is listening" "%LOG%" >nul 2>&1
+:: Match "listening on http", not "server is listening". b10901 logs
+:: "llama_server: listening on http://0.0.0.0:8080" while older builds
+:: logged "main: server is listening on http://...". The substring below
+:: is common to both; the old one silently stopped matching and every
+:: start ran the full 6-minute timeout against an already-ready server.
+findstr /C:"listening on http" "%LOG%" >nul 2>&1
 if not errorlevel 1 goto ready
 
 :: Detect failure by checking the process is still alive rather than

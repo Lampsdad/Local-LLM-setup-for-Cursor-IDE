@@ -23,24 +23,40 @@ echo.
 
 :: ---- current version ----
 if exist "llama-bin\llama-server.exe" (
-    rem "version: 8679 (94ca829b6)" is the line we want. /C:"build"
-    rem also matches "built with Clang ..." and yields "with".
-    for /f "tokens=2 delims= " %%V in ('llama-bin\llama-server.exe --version 2^>^&1 ^| findstr /C:"version:"') do set CURRENT=%%V
+    rem The "version:" line is the one we want. /C:"build" also matches
+    rem "built with Clang ..." and yields "with".
+    rem Take everything AFTER "version:" rather than a fixed token: the
+    rem format changed from "version: 8679 (94ca829b6)" to
+    rem "version: 0.4.0-dev (build 10901, commit 28ff09582)", so tokens=2
+    rem now reports "0.4.0-dev" instead of a build number.
+    for /f "tokens=1,* delims= " %%V in ('llama-bin\llama-server.exe --version 2^>^&1 ^| findstr /C:"version:"') do set CURRENT=%%W
     echo  Installed build : !CURRENT!
 ) else (
     echo  Installed build : none
 )
 
-:: ---- latest release tag ----
-echo  Querying GitHub for the latest release...
-for /f "usebackq delims=" %%T in (`powershell -NoProfile -Command ^
-    "(Invoke-RestMethod 'https://api.github.com/repos/ggml-org/llama.cpp/releases/latest').tag_name"`) do set TAG=%%T
+:: ---- latest build tag ----
+:: NOT /releases/latest. Since 2026-09 that resolves to the v0.N.N
+:: stable line, which ships no win-cuda-13.3-x64 asset, so the
+:: download 404s. The nightly builds are still tagged bNNNN, and the
+:: list endpoint returns them newest-first.
+::
+:: Two cmd landmines here, both silent:
+::  - a BARE | works inside a for /f backquote; escaping it as ^| passes
+::    the caret through to PowerShell and the call dies.
+::  - Select-Object -First 1 is dropped on this path -- every tag comes
+::    back regardless. So take the first line in batch with
+::    'if not defined TAG' instead of trying to limit it in PowerShell.
+:: Keep the for /f on ONE line and outside any if-block.
+echo  Querying GitHub for the latest build...
+set "TAG="
+for /f "usebackq delims=" %%T in (`powershell -NoProfile -Command "(Invoke-RestMethod 'https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=30' | Where-Object { $_.tag_name -like 'b*' }).tag_name"`) do if not defined TAG set "TAG=%%T"
 
 if "%TAG%"=="" (
     echo  ERROR: could not reach the GitHub API.
     pause & exit /b 1
 )
-echo  Latest release  : %TAG%
+echo  Latest build    : %TAG%
 echo.
 
 set ZIP=llama-%TAG%-%ASSET_PATTERN%.zip
