@@ -26,6 +26,9 @@ thing standing between an anonymous request and your GPU.
   existed gets re-locked the next time you start the server.
 - `api_key.txt` is in `.gitignore`, and CI fails the build if it is ever
   tracked.
+- `kiln opencode` does not copy the key into OpenCode's config. It writes
+  a `{file:...}` reference to `api_key.txt`, which OpenCode reads at
+  startup, so the credential stays in the one file that is locked down.
 
 ```bat
 kiln key show           :: print it (generates it on first use)
@@ -34,7 +37,7 @@ kiln key set MY-SECRET  :: use a passphrase of your own
 ```
 
 Rotating takes effect on the next server start, and you must paste the new
-value into Cursor.
+value into Cursor. OpenCode picks it up on its own next start.
 
 ## What the scripts do *not* do about it
 

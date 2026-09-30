@@ -107,6 +107,11 @@ scripts; the scanner for the first one is worth re-running after edits.
 - **Bare `call foo.bat` depends on cmd searching the current directory**,
   which `NoDefaultCurrentDirectoryInExePath=1` disables. Use
   `call "%~dp0foo.bat"`.
+- **`%~` inside a `::` comment is still expanded.** cmd substitutes
+  parameters before it knows the line is a comment, so a comment that
+  mentions `%~1` by name aborts the whole script with `The following
+  usage of the path operator in batch-parameter substitution is
+  invalid`. Describe it in words.
 - **`if COND set A & set B` runs `set B` unconditionally.** This made the
   download script's free-space check always assume the largest quant.
 

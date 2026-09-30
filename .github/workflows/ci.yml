@@ -36,6 +36,20 @@ jobs:
           # --external-sources lets it follow the sourced lib_*.sh files
           shellcheck --severity=error --external-sources $(git ls-files '*.sh')
 
+  python:
+    name: Python scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Byte-compile every Python script
+        run: python3 -m py_compile $(git ls-files '*.py')
+
+      # kiln opencode edits a config file other tools depend on; these
+      # pin that it refuses rather than writing something broken.
+      - name: kiln opencode
+        run: python3 .github/scripts/test_opencode.py
+
   line-endings:
     name: Line endings
     runs-on: ubuntu-latest
