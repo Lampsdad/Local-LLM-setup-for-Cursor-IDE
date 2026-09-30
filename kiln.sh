@@ -9,6 +9,7 @@
 #    ./kiln.sh start [base|ablit|9b|4b]
 #    ./kiln.sh stop           stop server and tunnel
 #    ./kiln.sh key [show|rotate]
+#    ./kiln.sh opencode       list the local models in OpenCode
 #    ./kiln.sh bench | quality | clean | help
 #
 #  This dispatches to the per-platform scripts in scripts/unix/.
@@ -167,6 +168,9 @@ usage() {
                      serve a model to Cursor
    stop              stop llama-server and cloudflared
    key [show|rotate] the API key Cursor needs
+   opencode          list the local models in OpenCode on this machine
+                     (--print to preview, --remove to undo,
+                     --url URL to pin the server address)
    bench             speed benchmarks
    quality           KL-divergence of each quant vs Q8_0
    clean             reclaim space from superseded GGUFs
@@ -268,6 +272,18 @@ case "$CMD" in
         echo " ./kiln.sh get   downloads exactly this"
         echo " Set KILN_MIN_CTX to trade context against quant quality."
         echo
+        ;;
+    opencode)
+        if [ -z "$PY" ]; then
+            echo "kiln: needs python3 to write the OpenCode config." >&2
+            exit 1
+        fi
+        # The config references api_key.txt rather than copying it,
+        # and OpenCode will not start if that file is missing.
+        # shellcheck source=scripts/unix/lib_api_key.sh
+        . "$UNIX/lib_api_key.sh"
+        shift
+        exec "$PY" "$ROOT/scripts/opencode.py" "$@"
         ;;
     bench)    exec "$UNIX/benchmark.sh" ;;
     quality)  exec "$UNIX/quality.sh" ;;

@@ -15,6 +15,7 @@ call "%~dp0lib_ui.bat"
 ::    kiln key [show|rotate|set <key>]
 ::    kiln hardware        what this machine can run
 ::    kiln update          upgrade llama.cpp
+::    kiln opencode        list the local models in OpenCode
 ::    kiln bench | clean | help
 ::
 ::  Everything here delegates to the existing scripts, and none
@@ -42,6 +43,7 @@ if /I "%CMD%"=="key"      goto :cmd_key
 if /I "%CMD%"=="update"   goto :cmd_update
 if /I "%CMD%"=="hardware" goto :cmd_hardware
 if /I "%CMD%"=="hw"       goto :cmd_hardware
+if /I "%CMD%"=="opencode" goto :cmd_opencode
 if /I "%CMD%"=="bench"    goto :cmd_bench
 if /I "%CMD%"=="clean"    goto :cmd_clean
 if /I "%CMD%"=="help"     goto :cmd_help
@@ -282,6 +284,7 @@ echo   %C_HL%3%C_0%  stop the server     %C_MU%kiln stop%C_0%
 echo   %C_HL%4%C_0%  show the API key    %C_MU%kiln key show%C_0%
 echo   %C_HL%5%C_0%  install or update   %C_MU%kiln setup, kiln update%C_0%
 echo   %C_HL%6%C_0%  what fits this GPU  %C_MU%kiln hardware%C_0%
+echo   %C_HL%7%C_0%  set up OpenCode     %C_MU%kiln opencode%C_0%
 echo   %C_HL%Q%C_0%  quit
 echo.
 set "SEL="
@@ -294,6 +297,7 @@ if "%SEL%"=="3" goto :cmd_stop
 if "%SEL%"=="4" goto :menu_key
 if "%SEL%"=="5" goto :cmd_setup
 if "%SEL%"=="6" goto :cmd_hardware
+if "%SEL%"=="7" goto :cmd_opencode
 echo  %C_ERR%Not a choice.%C_0%
 echo.
 goto :menu
@@ -457,6 +461,22 @@ if "%K%"=="REC_BELOW_MIN"  if "%V%"=="1" echo   %C_WARN%note       %C_0% below t
 if "%K%"=="REC_REASON"     echo   %C_ERR%no fit     %C_0% %V%
 exit /b 0
 
+:cmd_opencode
+call :find_python
+if not defined PY_EXE (
+    echo  %C_ERR%Python not found.%C_0% kiln needs it to write the OpenCode config.
+    echo  Install Python 3.8+ from https://python.org
+    exit /b 1
+)
+:: The config references api_key.txt rather than copying it, and
+:: OpenCode will not start if that file is missing.
+call "%~dp0lib_api_key.bat"
+if errorlevel 1 exit /b 1
+:: Raw positional args rather than ARG/ARG2: those had their quotes
+:: stripped, and a --config path with spaces needs them.
+%PY_EXE% "%~dp0..\opencode.py" %2 %3 %4 %5
+exit /b %errorlevel%
+
 :cmd_bench
 call "%~dp0benchmark.bat"
 exit /b %errorlevel%
@@ -487,6 +507,9 @@ echo                           208K context instead of 119K ^(slower generation^
 echo   %C_AC%stop%C_0%                    stop the server and the tunnel
 echo   %C_AC%key%C_0%   [show^|rotate^|set] manage the API key
 echo   %C_AC%hardware%C_0%                what this GPU can run, and at what context
+echo   %C_AC%opencode%C_0%                list the local models in OpenCode on this machine
+echo                           %C_AC%--print%C_0% to preview, %C_AC%--remove%C_0% to undo,
+echo                           %C_AC%--url URL%C_0% to pin the server address
 echo   %C_AC%bench%C_0%                   quant speed and throughput sweep
 echo   %C_AC%clean%C_0%                   reclaim disk from superseded GGUFs
 echo.

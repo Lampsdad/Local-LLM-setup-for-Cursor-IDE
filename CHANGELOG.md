@@ -8,6 +8,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`kiln opencode`** (`./kiln.sh opencode`) — lists the downloaded
+  Qwen builds in OpenCode as `kiln/<alias>`, each with the context window
+  `kiln start` would open for it. Works on Windows, WSL and Linux, and
+  works out the WSL-to-Windows address itself. Merges into an existing
+  config rather than replacing it, and references `api_key.txt` instead
+  of copying the key. `--remove` undoes it. Refuses, leaving the file
+  untouched, when the config cannot be parsed or the key file is missing.
+- **A Python job in CI** that byte-compiles every script and runs
+  `.github/scripts/test_opencode.py`.
 - **`kiln hardware`** — reads the GPU and prints the model, quant, MTP
   head, vision projector and context window that fit it, which is exactly
   what `kiln get` will download. Available as `kiln hardware` and
@@ -47,6 +56,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The `kiln setup` and `kiln update` lines of the README quick start had
+  run together onto one line.
 - **The documented 131K context on a 32 GB card was never what the code
   produced.** The probe computes 114688 with `UD-Q5_K_XL` + the q8_0 head
   + f16 vision; 131072 is what loaded when tried by hand. The comment

@@ -102,6 +102,7 @@ and CI fails if any get tracked anyway.
 ```bash
 bash -n $(git ls-files '*.sh')
 shellcheck --severity=error $(git ls-files '*.sh')
+python3 .github/scripts/test_opencode.py
 ```
 
 Open an issue before a large change so you do not build something that

@@ -28,6 +28,7 @@ macOS and Linux are a three-script equivalent, shown below.
 [Choosing a build](#choosing-a-build) ·
 [Choosing a quant](#choosing-a-quant) ·
 [Using with Cursor](#using-with-cursor) ·
+[Using with OpenCode](#using-with-opencode) ·
 [Security](#security) ·
 [Scripts](#scripts) ·
 [Tuned settings](#tuned-server-settings) ·
@@ -217,12 +218,14 @@ Every step is also a verb, if you would rather drive it yourself:
 
 ```bat
 kiln status       :: just the board
-kiln setup        :: llama.cpp, cloudflared, modelskiln update       :: upgrade llama.cpp (needed for MTP)
+kiln setup        :: llama.cpp, cloudflared, models
+kiln update       :: upgrade llama.cpp (needed for MTP)
 kiln get both     :: download the stock and abliterated weights
 kiln start        :: pick a build and serve it
 kiln start ablit  :: skip the picker
 kiln stop         :: stop the server and the tunnel
 kiln key show     :: print the API key for Cursor
+kiln opencode     :: list the local models in OpenCode
 kiln bench        :: quant speed and throughput sweep
 kiln clean        :: reclaim disk from superseded GGUFs
 ```
@@ -434,6 +437,70 @@ alone. Worth the fifteen minutes if you use this daily.
 
 ---
 
+## Using with OpenCode
+
+```bat
+kiln opencode          :: Windows
+```
+```bash
+./kiln.sh opencode     # WSL, Linux, macOS
+```
+
+This adds a `kiln` provider to OpenCode's global config
+(`~/.config/opencode/`, which is `C:\Users\<you>\.config\opencode` on
+Windows) and leaves everything else in that file alone. **Restart
+OpenCode afterwards** — it reads its config only at startup, and the
+desktop app keeps running in the tray after its window closes. Then pick
+a model with `/models`, or run `opencode -m kiln/qwen3.8-27b`.
+
+- **Every build you have downloaded is listed**, each with the context
+  window `kiln start` would open for it on your card, so OpenCode
+  compacts before llama-server runs out of room. Only the build that is
+  running answers; switching builds needs no re-run.
+- **The API key is referenced, not copied.** The config points at
+  `api_key.txt`, so `kiln key rotate` takes effect in OpenCode on its
+  next start. If you move or delete the repo, OpenCode refuses to load
+  its config until you re-run `kiln opencode`, or undo it first with
+  `kiln opencode --remove`.
+- **Re-run it after downloading another build.** It replaces its own
+  entry and nothing else. The first time it edits an existing file it
+  saves the original, comments included, as `*.kiln.bak`.
+- **It refuses rather than guesses.** A config it cannot parse, a
+  `provider` section that is not an object, or a missing `api_key.txt`
+  stops it with an explanation and the file untouched.
+
+**WSL counts as a separate machine.** OpenCode in WSL and OpenCode on
+Windows keep separate configs, so run it on each side you use. It works
+out the address for you:
+
+| Server runs in | OpenCode runs in | URL written |
+|---|---|---|
+| Windows | Windows | `127.0.0.1` |
+| WSL or Linux | the same place | `127.0.0.1` |
+| WSL | Windows | `127.0.0.1` (WSL forwards it) |
+| Windows | WSL, mirrored networking | `127.0.0.1` |
+| Windows | WSL, NAT networking (the default) | the Windows host IP |
+
+The last row is the fragile one: that IP changes whenever WSL restarts,
+and Windows Firewall may block it. Setting `networkingMode=mirrored`
+under `[wsl2]` in `%USERPROFILE%\.wslconfig`, then running
+`wsl --shutdown` and re-running `./kiln.sh opencode`, moves you to
+`127.0.0.1` for good.
+
+It only trusts what answers like llama-server, so another service on
+port 8080 is not mistaken for yours. One case it works around: WSL
+forwards anything published on 8080 inside WSL (a Docker container, say)
+to Windows' `127.0.0.1:8080`, which then shadows llama-server for every
+Windows client. OpenCode is pointed at the machine name instead, but the
+Cloudflare tunnel still forwards to `localhost` and breaks, so move the
+other service off 8080.
+
+To point at a server on another machine or behind a named tunnel, pin
+the address with `kiln opencode --url https://llm.example.com/v1`, or use
+`--print` to see the block without writing it.
+
+---
+
 ## Security
 
 The quick-tunnel URL is **public** — anyone who guesses or scrapes the
@@ -507,6 +574,7 @@ NOTES.md               why the tuned constants are what they are
 | Script | Purpose |
 |---|---|
 | `hardware.py` | The model registry and the sizing arithmetic. Detects the GPU, picks model + quant + MTP + context, and generates the tables above. Used by every other script on both platforms. |
+| `opencode.py` | Writes the `kiln` provider into OpenCode's config. Detects Windows, WSL or Linux and works out the server URL. Behind `kiln opencode`. |
 
 **macOS and Linux** (`scripts/unix/`)
 
@@ -615,7 +683,8 @@ same calculation run ahead of time.
 **Does this work with VS Code, Continue, Cline, Roo Code, Zed or Aider?**
 Yes. The server is a plain OpenAI-compatible endpoint, so anything that
 accepts a base URL, an API key and a model name will talk to it. Only the
-Cursor-specific setup steps differ.
+Cursor-specific setup steps differ. OpenCode gets a one-command setup:
+see [Using with OpenCode](#using-with-opencode).
 
 **How fast is it?** That depends on your card, quant and draft acceptance
 rate, so this repo ships a measurement path rather than a number:
