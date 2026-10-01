@@ -29,6 +29,11 @@ thing standing between an anonymous request and your GPU.
 - `kiln opencode` does not copy the key into OpenCode's config. It writes
   a `{file:...}` reference to `api_key.txt`, which OpenCode reads at
   startup, so the credential stays in the one file that is locked down.
+- `kiln self-update` runs only when you ask it to. It fast-forwards from
+  the `origin` you cloned, and only to a tagged release unless you opted
+  into `main`. The status board's daily check lists tags with
+  `git ls-remote` and downloads nothing. Set `KILN_NO_UPDATE_CHECK=1`
+  to turn the check off.
 
 ```bat
 kiln key show           :: print it (generates it on first use)

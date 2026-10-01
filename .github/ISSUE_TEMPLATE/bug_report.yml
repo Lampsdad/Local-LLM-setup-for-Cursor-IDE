@@ -40,6 +40,13 @@ body:
       required: true
 
   - type: input
+    id: kiln-version
+    attributes:
+      label: kiln version
+      description: The first row of the status board (`kiln status`, or `./kiln.sh` on macOS/Linux).
+      placeholder: v1.1.0
+
+  - type: input
     id: build
     attributes:
       label: llama.cpp build number

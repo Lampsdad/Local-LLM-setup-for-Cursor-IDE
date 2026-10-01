@@ -50,6 +50,11 @@ jobs:
       - name: kiln opencode
         run: python3 .github/scripts/test_opencode.py
 
+      # kiln self-update rewrites the user's checkout; these pin that it
+      # refuses rather than discard a local edit or a local commit.
+      - name: kiln self-update
+        run: python3 .github/scripts/test_selfupdate.py
+
   line-endings:
     name: Line endings
     runs-on: ubuntu-latest
