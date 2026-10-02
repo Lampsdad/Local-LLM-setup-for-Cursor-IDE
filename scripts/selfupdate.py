@@ -62,7 +62,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
-REPO_URL = "https://github.com/Lampsdad/Local-LLM-setup-for-Cursor-IDE"
+REPO_URL = "https://github.com/Lampsdad/kiln-local-llm"
 REMOTE = "origin"
 BRANCH = "main"
 CHANNELS = ("release", "main")
