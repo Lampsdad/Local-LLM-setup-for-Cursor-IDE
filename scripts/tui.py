@@ -32,6 +32,7 @@ asks again.
 """
 
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -99,6 +100,10 @@ def install():
     if not os.path.isfile(venv_python()):
         print(" Creating %s ..." % rel)
         if subprocess.call([sys.executable, "-m", "venv", VENV]) != 0:
+            # Debian's venv makes bin/python before it finds ensurepip
+            # missing. Left there, the next run, after the apt install
+            # below, would skip straight to a pip that is not in it.
+            shutil.rmtree(VENV, ignore_errors=True)
             print()
             print(" Python could not create a virtual environment.")
             if not WINDOWS and sys.platform != "darwin":

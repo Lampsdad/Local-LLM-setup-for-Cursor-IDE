@@ -19,8 +19,10 @@ import contextlib
 import io
 import os
 import sys
+import tempfile
 import threading
 import unittest
+from unittest import mock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
@@ -51,6 +53,30 @@ class Bootstrap(unittest.TestCase):
         finally:
             sys.version_info = saved
         self.assertIn("needs Python 3.9", out.getvalue())
+
+    def test_a_venv_that_failed_halfway_is_made_again_next_time(self):
+        # Debian without python3-venv: venv makes bin/python, then
+        # fails at ensurepip. Left behind, the next run, after the
+        # apt install it advises, would go straight to a missing pip.
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+
+        def call(argv, **kw):
+            os.makedirs(os.path.dirname(tui.venv_python()))
+            open(tui.venv_python(), "w").close()
+            return 1
+
+        class Terminal(io.StringIO):
+            def isatty(self):
+                return True
+
+        with mock.patch.object(tui, "VENV", os.path.join(tmp.name, "v")), \
+                mock.patch.object(tui.subprocess, "call", call), \
+                mock.patch.object(sys, "stdin", Terminal()), \
+                mock.patch("builtins.input", return_value=""), \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertFalse(tui.install())
+            self.assertFalse(os.path.exists(tui.VENV))
 
     def test_requirement_matches_the_major_it_checks(self):
         self.assertIn(">=%d." % tui.MAJOR, tui.REQUIREMENT)
