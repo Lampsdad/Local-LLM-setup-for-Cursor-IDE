@@ -365,7 +365,10 @@ def update(root, channel=None):
     say("Fetching from GitHub...")
     # Forced (+) so a tag moved on GitHub replaces the local copy
     # instead of failing the fetch with "would clobber existing tag".
-    git(root, "fetch", "--quiet", "--no-tags", REMOTE,
+    # --no-prune, or fetch.prune=true in the user's git config deletes
+    # every local tag GitHub does not have, and a tag can be the only
+    # name for a commit.
+    git(root, "fetch", "--quiet", "--no-tags", "--no-prune", REMOTE,
         "+refs/heads/%s:refs/remotes/%s/%s" % (BRANCH, REMOTE, BRANCH),
         "+refs/tags/*:refs/tags/*", timeout=FETCH_TIMEOUT)
 

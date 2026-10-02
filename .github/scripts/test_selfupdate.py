@@ -145,6 +145,17 @@ class ReleaseChannelTest(Base):
         self.assertIn("already past the newest", out)
         self.assertIn("--main", out)
 
+    def test_local_tags_survive_fetch_prune(self):
+        # fetch.prune=true is a common setting, and on the tag refspec
+        # the update fetches it would delete every tag GitHub lacks.
+        self.publish("kiln.sh", "two", tag="v1.1.0")
+        self.commit(self.user, "mine.txt", "mine")
+        sh(self.user, "tag", "my-work")
+        sh(self.user, "reset", "--quiet", "--hard", "HEAD~1")
+        sh(self.user, "config", "fetch.prune", "true")
+        self.assertEqual(self.run_cli()[0], 0)
+        self.assertEqual(sh(self.user, "tag", "--list", "my-work"), "my-work")
+
     def test_versions_compare_as_numbers(self):
         self.assertEqual(selfupdate.newest_release(
             ["v1.9.0", "v1.10.0", "v2-beta", "v3.0.0-rc1", "latest"]),
