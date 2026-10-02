@@ -229,13 +229,14 @@ case "$CMD" in
         esac
         ;;
     start)
-        # Either order, as start.bat takes them: start ablit --no-mtp
+        # Either order, as start.bat takes them: start ablit --no-mtp.
+        # The first variant wins, as it does there.
         shift
         WANT=""
         for a in "$@"; do
             case "$a" in
                 --no-mtp)         export KILN_NO_MTP=1 ;;
-                ablit|base|9b|4b) WANT="$a" ;;
+                ablit|base|9b|4b) [ -n "$WANT" ] || WANT="$a" ;;
                 *)  echo "kiln: unknown start option '$a' (use base, ablit, 9b, 4b or --no-mtp)" >&2; exit 1 ;;
             esac
         done

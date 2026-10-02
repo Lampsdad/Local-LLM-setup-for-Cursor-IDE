@@ -395,7 +395,8 @@ echo.
 if defined KILN_NO_TUNNEL (
     echo  Tunnel skipped ^(KILN_NO_TUNNEL^) -- no public URL.
     echo  Base URL: http://localhost:%PORT%/v1   ^(model: %ALIAS%^)
-    exit /b 0
+    echo  API key : %API_KEY%
+    pause & exit /b 0
 )
 if not exist "%CF_EXE%" (
     echo  cloudflared not found -- serving locally only.

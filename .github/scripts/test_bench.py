@@ -12,6 +12,8 @@ Hermetic: kiln is replaced by a Python one-liner, and llama-server by a
 fake that answers /health, /props, /tokenize and /completion the way
 the real one does.
 """
+import contextlib
+import io
 import os
 import sys
 import tempfile
@@ -482,6 +484,31 @@ class Run(unittest.TestCase):
         self.assertEqual(ctl.calls[-1][0], "stop")
         self.assertEqual(server.state, "stopped")
 
+
+    def test_ctrl_c_on_the_command_line_keeps_what_finished(self):
+        server = FakeServer()
+        post = server.post
+
+        def interrupted(url, body, key, timeout=None):
+            # Ctrl+C while the second setup is being measured.
+            if len([c for c in ctl.calls if c[0] == "start"]) == 2:
+                raise KeyboardInterrupt
+            return post(url, body, key, timeout)
+
+        bench._post = interrupted
+        control.locate = server.locate
+        opencode.probe = server.probe
+        ctl = FakeControl(server)
+        ctl.status = lambda: status([model("base")])
+        real = control.Control
+        self.addCleanup(setattr, control, "Control", real)
+        control.Control = type("Patched", (real,), {"__new__": lambda c: ctl})
+        with contextlib.redirect_stdout(io.StringIO()):
+            code = bench.main(["base", "base-nomtp"])
+        self.assertEqual(code, 130)
+        self.assertEqual([r["id"] for r in bench.load()["results"]], ["base"])
+        self.assertEqual(ctl.calls[-1][0], "stop")
+        self.assertEqual(server.state, "stopped")
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

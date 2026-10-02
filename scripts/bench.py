@@ -45,6 +45,7 @@ offer the pick as the default start.
 
 import argparse
 import glob
+import http.client
 import json
 import os
 import statistics
@@ -201,7 +202,9 @@ def _post(url, body, key, timeout=REQUEST_TIMEOUT):
         detail = e.read().decode("utf-8", "replace")[:300]
         raise Failed("%s answered %d: %s" % (url.rsplit("/", 1)[-1], e.code,
                                              detail))
-    except (OSError, ValueError) as e:
+    except (OSError, ValueError, http.client.HTTPException) as e:
+        # HTTPException: a reply cut short, as when the server dies
+        # mid-answer. Anything uncaught here would end the run.
         raise Failed("request to %s failed: %s" % (url.rsplit("/", 1)[-1], e))
 
 
@@ -705,15 +708,21 @@ def main(argv=None):
             print("  failed: " + a[0]["error"])
 
     runner = Runner(ctl, chosen, depth, emit)
+    interrupted = False
     try:
         doc = runner.run()
     except KeyboardInterrupt:
+        # run() has stopped the server on the way out. Keep the setups
+        # that finished, as cancelling in kiln tui does.
         runner.cancel()
-        return 130
+        interrupted = True
+        doc = save(runner.results, depth, ctl) if runner.results else None
     if doc:
         print()
         print(report(doc, uncensored))
         print("\nSaved to %s" % os.path.basename(RESULTS_FILE))
+    if interrupted:
+        return 130
     return 0 if doc else 1
 
 

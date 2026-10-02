@@ -781,7 +781,7 @@ class KilnApp(App):
             s["benchmark"] = bench.load()
         except Exception as e:  # keep the app alive; say what broke
             self.call_from_thread(self.notify, "Could not read status: %s"
-                                  % e, severity="error")
+                                  % e, severity="error", markup=False)
             return
         finally:
             self._refreshing = False
