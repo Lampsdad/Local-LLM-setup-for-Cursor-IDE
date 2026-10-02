@@ -114,6 +114,16 @@ scripts; the scanner for the first one is worth re-running after edits.
   invalid`. Describe it in words.
 - **`if COND set A & set B` runs `set B` unconditionally.** This made the
   download script's free-space check always assume the largest quant.
+- **A batch file rewritten while it runs resumes partway through a
+  line.** cmd does not load a batch file into memory. It reopens the
+  file for every line and continues from a saved byte offset. `kiln
+  self-update` replaces both `kiln.bat` files while they are running,
+  and in a test that grew the file, cmd went on to execute half a line
+  of the new one. Whatever has to run after a step that rewrites the
+  file goes on that step's line, for example `python ... & exit /b
+  !errorlevel!`. A bare `exit /b` there keeps ERRORLEVEL for a caller,
+  but `cmd /c` still exits 0, so the root shim uses `call exit /b
+  %%errorlevel%%`.
 
 ## Disk
 

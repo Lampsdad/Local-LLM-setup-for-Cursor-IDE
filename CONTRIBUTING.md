@@ -97,12 +97,44 @@ branch there and nowhere else.
 Weights, `llama-bin/`, logs, and `api_key.txt`. `.gitignore` covers them
 and CI fails if any get tracked anyway.
 
+## Cutting a release
+
+`kiln self-update` moves people to the newest `vX.Y.Z` tag, not to the
+tip of `main`. A merge to `main` reaches only the people who opted in
+with `--main`. Everyone else gets it at the next tag:
+
+1. In `CHANGELOG.md`, rename `[Unreleased]` to the new version and
+   today's date, and start an empty `[Unreleased]` above it.
+2. Commit that to `main` and wait for CI to pass.
+3. Tag that commit and push the tag:
+
+```bash
+git tag -a v1.1.0 -m "v1.1.0"
+git push origin v1.1.0
+```
+
+Publishing a GitHub release for the tag is optional. Self-update only
+reads the tag.
+
+- **Tag commits on `main`.** Users fast-forward their `main` to the
+  tag, which only works if the tag is on its history.
+- **Never move a tag once it is pushed.** Anyone who already updated to
+  it is left on a commit the new tag does not descend from, and their
+  next update refuses. Ship the fix as the next patch version instead.
+- **Only exact `vMAJOR.MINOR.PATCH` names count.** `v1.2.0-rc1` or
+  `test` is ignored, so a tag like that never reaches anyone.
+
+Bump the patch number for fixes and the minor number for new commands
+or changed defaults. Bump the major number when an update means
+re-downloading weights or relearning commands.
+
 ## Running the checks locally
 
 ```bash
 bash -n $(git ls-files '*.sh')
 shellcheck --severity=error $(git ls-files '*.sh')
 python3 .github/scripts/test_opencode.py
+python3 .github/scripts/test_selfupdate.py
 ```
 
 Open an issue before a large change so you do not build something that

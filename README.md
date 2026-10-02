@@ -192,6 +192,7 @@ one thing to do next, and gives you a menu:
  |_|\_\|_||_||_| |_|  local models, fired on your own GPU
 
  ------------------------------------------------------------
+  kiln           v1.1.0
   llama.cpp      installed  build 9431
   MTP support    available
   cloudflared    installed
@@ -228,6 +229,7 @@ kiln key show     :: print the API key for Cursor
 kiln opencode     :: list the local models in OpenCode
 kiln bench        :: quant speed and throughput sweep
 kiln clean        :: reclaim disk from superseded GGUFs
+kiln self-update  :: update kiln itself to the newest release
 ```
 
 ### macOS and Linux
@@ -248,6 +250,7 @@ Fedora/RHEL and calls the right platform script for you:
 ./kiln.sh start ablit     # or the abliterated build
 ./kiln.sh stop
 ./kiln.sh key show
+./kiln.sh self-update     # update kiln itself to the newest release
 ```
 
 Override the quant with an environment variable:
@@ -261,6 +264,39 @@ key. The shell path sizes context with llama.cpp's `--fit on` rather
 than the Windows probe, so no table lookup is needed there.
 `scripts/unix/slurm-llama.sh` runs the same server as a Slurm batch job
 so the GPU shows as allocated in `squeue`.
+
+### Keeping kiln up to date
+
+```bat
+kiln self-update            :: move to the newest release
+kiln self-update --check    :: only say whether there is one
+kiln self-update --main     :: follow every change on main instead
+kiln self-update --release  :: go back to releases
+```
+
+`./kiln.sh self-update` takes the same flags. This is not the same as
+`kiln update`, which upgrades llama.cpp.
+
+By default kiln follows **releases**. It moves only when a new `vX.Y.Z`
+is tagged, never to work in progress on `main`. With `--main` you get
+every change the day it lands, and that choice is remembered until
+`--release` switches back.
+
+The update is a git fast-forward, so `models/`, `llama-bin/` and
+`api_key.txt` are never touched. When it cannot update safely, it
+changes nothing and says why. That happens when a tracked file has local
+edits (it shows how to `git stash` them), when `main` has commits of
+your own, or when another branch is checked out. It needs the
+`git clone` install, because a "Download ZIP" copy has no history to
+update from. If a server is running, restart it afterwards.
+
+The first row of the status board shows the version you are on and
+says when a newer release is out. To find out, it asks GitHub once a day
+with `git ls-remote`, which downloads nothing, and gives up after a few
+seconds when offline. Set `KILN_NO_UPDATE_CHECK=1` to turn the check off.
+
+If you cloned before `self-update` existed, run `git pull` once to
+get it.
 
 ---
 
@@ -575,6 +611,7 @@ NOTES.md               why the tuned constants are what they are
 |---|---|
 | `hardware.py` | The model registry and the sizing arithmetic. Detects the GPU, picks model + quant + MTP + context, and generates the tables above. Used by every other script on both platforms. |
 | `opencode.py` | Writes the `kiln` provider into OpenCode's config. Detects Windows, WSL or Linux and works out the server URL. Behind `kiln opencode`. |
+| `selfupdate.py` | Fast-forwards the checkout to the newest release, or to `main` if you opted in. Refuses rather than overwrite local edits or commits. Behind `kiln self-update` and the board's `kiln` row. |
 
 **macOS and Linux** (`scripts/unix/`)
 

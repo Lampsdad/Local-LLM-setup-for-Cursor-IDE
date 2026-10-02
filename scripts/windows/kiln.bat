@@ -16,6 +16,7 @@ call "%~dp0lib_ui.bat"
 ::    kiln hardware        what this machine can run
 ::    kiln update          upgrade llama.cpp
 ::    kiln opencode        list the local models in OpenCode
+::    kiln self-update     update kiln itself from GitHub
 ::    kiln bench | clean | help
 ::
 ::  Everything here delegates to the existing scripts, and none
@@ -44,6 +45,7 @@ if /I "%CMD%"=="update"   goto :cmd_update
 if /I "%CMD%"=="hardware" goto :cmd_hardware
 if /I "%CMD%"=="hw"       goto :cmd_hardware
 if /I "%CMD%"=="opencode" goto :cmd_opencode
+if /I "%CMD%"=="self-update" goto :cmd_self_update
 if /I "%CMD%"=="bench"    goto :cmd_bench
 if /I "%CMD%"=="clean"    goto :cmd_clean
 if /I "%CMD%"=="help"     goto :cmd_help
@@ -80,6 +82,7 @@ exit /b 0
 
 :board
 call :rule
+call :row "kiln"         "%ST_KILN_S%"
 call :row "llama.cpp"    "%ST_BIN_S%"
 call :row "MTP support"  "%ST_MTP_S%"
 call :row "cloudflared"  "%ST_CF_S%"
@@ -185,6 +188,18 @@ if defined TIER_LABEL (
     )
 )
 
+:: ---- kiln itself ----
+:: The checkout's version, and whether GitHub has a newer one.
+:: selfupdate.py asks at most once a day and gives up after a few
+:: seconds offline, so this is free on almost every render. It
+:: strips anything cmd would parse out of what it prints.
+set "KILN_VERSION="
+set "KILN_UPDATE="
+set "ST_KILN_S=%C_MU%unknown%C_0%"
+if defined PY_EXE for /f "usebackq tokens=1,* delims==" %%A in (`%PY_EXE% "%~dp0..\selfupdate.py" --notice 2^>nul`) do set "%%A=%%B"
+if defined KILN_VERSION set "ST_KILN_S=%C_HL%!KILN_VERSION!%C_0%"
+if defined KILN_UPDATE set "ST_KILN_S=!ST_KILN_S!  %C_WARN%!KILN_UPDATE! available%C_0%  %C_MU%kiln self-update%C_0%"
+
 :: ---- disk ----
 set "ST_FREE_S=%C_MU%unknown%C_0%"
 for /f "usebackq delims=" %%F in (`powershell -NoProfile -Command "[math]::Round((Get-PSDrive C).Free/1GB,0)"`) do set "ST_FREE_S=%C_HL%%%F GB%C_0%"
@@ -285,6 +300,7 @@ echo   %C_HL%4%C_0%  show the API key    %C_MU%kiln key show%C_0%
 echo   %C_HL%5%C_0%  install or update   %C_MU%kiln setup, kiln update%C_0%
 echo   %C_HL%6%C_0%  what fits this GPU  %C_MU%kiln hardware%C_0%
 echo   %C_HL%7%C_0%  set up OpenCode     %C_MU%kiln opencode%C_0%
+echo   %C_HL%8%C_0%  update kiln itself  %C_MU%kiln self-update%C_0%
 echo   %C_HL%Q%C_0%  quit
 echo.
 set "SEL="
@@ -298,6 +314,7 @@ if "%SEL%"=="4" goto :menu_key
 if "%SEL%"=="5" goto :cmd_setup
 if "%SEL%"=="6" goto :cmd_hardware
 if "%SEL%"=="7" goto :cmd_opencode
+if "%SEL%"=="8" goto :cmd_self_update
 echo  %C_ERR%Not a choice.%C_0%
 echo.
 goto :menu
@@ -477,6 +494,23 @@ if errorlevel 1 exit /b 1
 %PY_EXE% "%~dp0..\opencode.py" %2 %3 %4 %5
 exit /b %errorlevel%
 
+:cmd_self_update
+call :find_python
+if not defined PY_EXE (
+    echo  %C_ERR%Python not found.%C_0% kiln needs it to update itself.
+    echo  Install Python 3.8+ from https://python.org, or update by hand: git pull
+    exit /b 1
+)
+:: The update rewrites this file while it is running. cmd does not
+:: hold a batch file in memory: it re-opens it for every line and
+:: resumes at a saved byte offset, so once the file has changed
+:: underneath it, the next line it reads starts partway through
+:: whatever now sits at that offset. The exit is on the same line
+:: as the update so it is parsed before the file changes, and it
+:: uses delayed expansion so it returns Python's exit code, not the
+:: one from before Python ran.
+%PY_EXE% "%~dp0..\selfupdate.py" %2 %3 & exit /b !errorlevel!
+
 :cmd_bench
 call "%~dp0benchmark.bat"
 exit /b %errorlevel%
@@ -510,6 +544,9 @@ echo   %C_AC%hardware%C_0%                what this GPU can run, and at what con
 echo   %C_AC%opencode%C_0%                list the local models in OpenCode on this machine
 echo                           %C_AC%--print%C_0% to preview, %C_AC%--remove%C_0% to undo,
 echo                           %C_AC%--url URL%C_0% to pin the server address
+echo   %C_AC%self-update%C_0%             update kiln itself to the newest release
+echo                           %C_AC%--main%C_0% to follow every change on main,
+echo                           %C_AC%--check%C_0% to only report what is available
 echo   %C_AC%bench%C_0%                   quant speed and throughput sweep
 echo   %C_AC%clean%C_0%                   reclaim disk from superseded GGUFs
 echo.

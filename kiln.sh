@@ -10,6 +10,7 @@
 #    ./kiln.sh stop           stop server and tunnel
 #    ./kiln.sh key [show|rotate]
 #    ./kiln.sh opencode       list the local models in OpenCode
+#    ./kiln.sh self-update    update kiln itself from GitHub
 #    ./kiln.sh bench | quality | clean | help
 #
 #  This dispatches to the per-platform scripts in scripts/unix/.
@@ -61,6 +62,25 @@ status() {
     sed 's/^/  /' "$ROOT/assets/banner.txt" 2>/dev/null || true
     printf '\n'
     printf ' %s\n' '------------------------------------------------------------'
+
+    # kiln itself: the version, and whether GitHub has a newer one.
+    # selfupdate.py asks at most once a day and gives up after a few
+    # seconds offline, so this is free on almost every render.
+    local kv="" ku=""
+    if [ -n "$PY" ]; then
+        while IFS='=' read -r k v; do
+            case "$k" in
+                KILN_VERSION) kv="$v" ;;
+                KILN_UPDATE)  ku="$v" ;;
+            esac
+        done < <("$PY" "$ROOT/scripts/selfupdate.py" --notice 2>/dev/null \
+                     | kiln_strip_cr || true)
+    fi
+    if [ -n "$ku" ]; then
+        printf '  %-14s %s\n' "kiln" "${kv:-unknown}  $ku available  ./kiln.sh self-update"
+    else
+        printf '  %-14s %s\n' "kiln" "${kv:-unknown}"
+    fi
 
     if [ -x "$bin" ]; then
         printf '  %-14s %s\n' "llama.cpp" "installed"
@@ -171,6 +191,9 @@ usage() {
    opencode          list the local models in OpenCode on this machine
                      (--print to preview, --remove to undo,
                      --url URL to pin the server address)
+   self-update       update kiln itself to the newest release
+                     (--main to follow every change on main,
+                     --check to only report what is available)
    bench             speed benchmarks
    quality           KL-divergence of each quant vs Q8_0
    clean             reclaim space from superseded GGUFs
@@ -284,6 +307,16 @@ case "$CMD" in
         . "$UNIX/lib_api_key.sh"
         shift
         exec "$PY" "$ROOT/scripts/opencode.py" "$@"
+        ;;
+    self-update)
+        if [ -z "$PY" ]; then
+            echo "kiln: needs python3 to update itself. Or by hand: git pull" >&2
+            exit 1
+        fi
+        # exec, so bash is not left reading a kiln.sh the update has
+        # just replaced.
+        shift
+        exec "$PY" "$ROOT/scripts/selfupdate.py" "$@"
         ;;
     bench)    exec "$UNIX/benchmark.sh" ;;
     quality)  exec "$UNIX/quality.sh" ;;

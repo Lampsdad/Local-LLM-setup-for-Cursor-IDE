@@ -8,6 +8,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`kiln self-update`** (`./kiln.sh self-update`) updates kiln itself
+  from GitHub. By default it moves to the newest `vX.Y.Z` release.
+  `--main` follows every change on `main` instead and is remembered.
+  `--check` only reports. The update is a git fast-forward, so `models/`,
+  `llama-bin/` and `api_key.txt` are never touched. It refuses, changing
+  nothing, when there are local edits, local commits or another branch
+  checked out. It is also item 8 on the Windows menu.
+- **A `kiln` row on the status board** shows the version you are on, and
+  the newest release when there is a newer one. It asks GitHub at most
+  once a day with `git ls-remote`. `KILN_NO_UPDATE_CHECK=1` turns that
+  off.
+- **`.github/scripts/test_selfupdate.py`** runs in CI against throwaway
+  repositories and checks that every refusal leaves HEAD where it was.
 - **`kiln opencode`** (`./kiln.sh opencode`) — lists the downloaded
   Qwen builds in OpenCode as `kiln/<alias>`, each with the context window
   `kiln start` would open for it. Works on Windows, WSL and Linux, and
@@ -53,6 +66,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The three Unix start scripts and `slurm-llama.sh` now share
   `lib_select.sh` instead of each carrying its own hardcoded quant, MTP
   filename and context.
+- **The root `kiln.bat` exits on the same line that calls the CLI.** An
+  update that rewrites the file can no longer leave cmd reading half a
+  line of the new version.
 
 ### Fixed
 
