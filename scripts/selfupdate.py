@@ -365,7 +365,13 @@ def update(root, channel=None):
     # --no-prune, or fetch.prune=true in the user's git config deletes
     # every local tag GitHub does not have, and a tag can be the only
     # name for a commit.
-    git(root, "fetch", "--quiet", "--no-tags", "--no-prune", REMOTE,
+    fetch = ["fetch", "--quiet", "--no-tags", "--no-prune"]
+    # A shallow clone (git clone --depth) has only the newest commits,
+    # so a release older than HEAD looks unrelated to it rather than
+    # behind it. Fetch the rest so the checks below can tell.
+    if git(root, "rev-parse", "--is-shallow-repository") == "true":
+        fetch.append("--unshallow")
+    git(root, *fetch, REMOTE,
         "+refs/heads/%s:refs/remotes/%s/%s" % (BRANCH, REMOTE, BRANCH),
         "+refs/tags/*:refs/tags/*", timeout=FETCH_TIMEOUT)
 

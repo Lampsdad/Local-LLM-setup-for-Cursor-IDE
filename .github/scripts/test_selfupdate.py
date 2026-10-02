@@ -15,6 +15,7 @@ import contextlib
 import io
 import json
 import os
+import pathlib
 import subprocess
 import sys
 import tempfile
@@ -144,6 +145,19 @@ class ReleaseChannelTest(Base):
         self.assertEqual(self.head(), tip)
         self.assertIn("already past the newest", out)
         self.assertIn("--main", out)
+
+    def test_a_shallow_clone_past_the_newest_release_stays(self):
+        tip = self.publish("kiln.sh", "unreleased work")
+        shallow = self.path("shallow")
+        # A file URL, because git ignores --depth for a plain path.
+        sh(self.tmp.name, "clone", "--quiet", "--depth", "1",
+           pathlib.Path(self.origin).as_uri(), shallow)
+        selfupdate.ROOT = shallow
+        code, out = self.run_cli()
+        self.assertEqual(code, 0, out)
+        self.assertIn("already past the newest", out)
+        self.assertEqual(sh(shallow, "rev-parse", "HEAD"), tip)
+        self.assertNotIn("KILN_UPDATE", self.notice())
 
     def test_a_tag_deleted_on_github_is_not_followed(self):
         # v1.20.0 was a typo for v1.2.0, deleted on GitHub after this
