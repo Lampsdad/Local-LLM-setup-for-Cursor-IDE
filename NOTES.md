@@ -18,8 +18,8 @@ The defaults in this repo were developed and validated on:
 
 `scripts/windows/start.bat` no longer hardcodes any of this — it reads
 VRAM and physical core count via `probe_hardware.ps1` at launch. The numbers
-above are what the hand-validated 131K context figure was measured
-against.
+above are what the hand-loaded 131K context figure was measured against
+(see the formula note below — the probe computes 112K / 114688).
 
 ## Context-sizing formula
 
@@ -37,9 +37,11 @@ grows with batch shape, and the driver footprint moves. Aiming at 100% of
 the arithmetic budget reliably OOMs.
 
 On the reference machine with `UD-Q5_K_XL` + MTP + vision this yields
-exactly **131,072**, matching the value measured by hand before the
-formula existed. That agreement is the reason for the specific constants;
-if you change one, re-check that case.
+**114,688** (112K), which is what the README tables report. **131,072**
+is what actually loaded when tried by hand before the formula existed —
+i.e. the 0.85 margin is real headroom, not a fit to 131K. Do not claim
+the formula produces 131K; if you change a constant, re-check that the
+probe still lands on 114688 for this card.
 
 `34,816 bytes/token` is `16 cached layers × 4 KV heads × 256 head-dim × 2
 (K+V) = 32,768 elements`, at q8_0's 34 bytes per 32-element block.
@@ -133,7 +135,7 @@ worth knowing:
 - `~/.cache/huggingface` holds ~180 GB from *other* research projects.
   `cleanup.bat` deliberately does not touch it.
 - The KL-divergence reference logits (`models/kld-base-qwen3.8.dat`)
-  produced by `measure_quant_quality` are large. Delete them once you
+  produced by `kiln quality` (`quality.{bat,sh}`) are large. Delete them once you
   have settled on a quant.
 
 ## Slurm

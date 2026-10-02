@@ -19,7 +19,7 @@ kiln
 
 One command on Windows. It prints what is installed, downloaded and
 running, tells you the one thing to do next, and gives you a menu.
-macOS and Linux are a three-script equivalent, shown below.
+macOS and Linux use the same front door: `./kiln.sh` (same verbs).
 
 **Contents** — [Why not Ollama?](#why-not-just-use-ollama-or-lm-studio) ·
 [Will this run on my GPU?](#will-this-run-on-my-gpu) ·
@@ -55,9 +55,10 @@ want *this* model running *well*:
   context window that fit, rather than assuming a card you may not own.
   On a 12 GB card that means a different *model*, not just a smaller
   context.
-- **A measurement path, not just claims.** `benchmark_qwen3.8.*` and
-  `quality` let you check every tuning decision here
-  against your own hardware and your own copies of the files.
+- **A measurement path, not just claims.** `kiln bench`
+  (`benchmark.{bat,sh}`) and `kiln quality` (`quality.{bat,sh}`) let you
+  check every tuning decision here against your own hardware and your
+  own copies of the files.
 - **Remote access built in.** A Cloudflare tunnel plus a generated API
   key, so you can point Cursor at your desktop GPU from a laptop.
 
@@ -246,11 +247,15 @@ Fedora/RHEL and calls the right platform script for you:
 
 ```bash
 ./kiln.sh setup           # llama.cpp, cloudflared, models/
+./kiln.sh hardware        # what this GPU can run, and at what context
 ./kiln.sh get both        # download the stock and abliterated weights
 ./kiln.sh start           # serve a model to Cursor
 ./kiln.sh start ablit     # or the abliterated build
 ./kiln.sh stop
 ./kiln.sh key show
+./kiln.sh opencode        # list the local models in OpenCode
+./kiln.sh bench           # quant speed and throughput sweep
+./kiln.sh quality         # KL-divergence of each quant vs Q8_0
 ./kiln.sh self-update     # update kiln itself to the newest release
 ./kiln.sh start --no-mtp  # trade the MTP head for a larger window
 ./kiln.sh tui             # all of the above as a full-screen app
@@ -722,8 +727,8 @@ NOTES.md               why the tuned constants are what they are
 | `--api-key-file` | `api_key.txt` | see Security |
 
 The batch sizes and KV precision are reasoned from the architecture,
-**not measured**. `benchmark_qwen3.8.*` measures them so you can confirm
-or override.
+**not measured**. `kiln bench` (`benchmark.{bat,sh}`) measures them so
+you can confirm or override.
 
 ---
 
