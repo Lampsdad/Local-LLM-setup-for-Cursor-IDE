@@ -27,9 +27,9 @@ architecture rather than guessed:
   in the README)
 - `--parallel 1`, and the 4096/1024 batch sizes
 
-If you change one, say what you measured. `benchmark_qwen3.8.*` and
-`measure_quant_quality.*` exist so that these can be checked rather than
-argued about. A PR that changes a number with a reason beats one that
+If you change one, say what you measured. `kiln bench`
+(`benchmark.{bat,sh}`) and `kiln quality` (`quality.{bat,sh}`) exist so
+that these can be checked rather than argued about. A PR that changes a number with a reason beats one that
 changes it with a preference.
 
 ## Layout, and the one rule that matters
@@ -110,8 +110,8 @@ with `--main`. Everyone else gets it at the next tag:
 3. Tag that commit and push the tag:
 
 ```bash
-git tag -a v1.1.0 -m "v1.1.0"
-git push origin v1.1.0
+git tag -a v1.2.0 -m "v1.2.0"
+git push origin v1.2.0
 ```
 
 Publishing a GitHub release for the tag is optional. Self-update only

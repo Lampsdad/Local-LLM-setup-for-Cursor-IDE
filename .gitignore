@@ -1,4 +1,4 @@
-# Models — too large for git (30–37 GB each); use download_model scripts
+# Models — too large for git (30–37 GB each); use kiln get
 models/
 
 # Platform-specific pre-compiled binaries; use install scripts to fetch these
@@ -18,7 +18,7 @@ cloudflared.url.tmp
 # Server API key (generated per-machine by the start scripts)
 api_key.txt
 
-# Previous llama.cpp build kept by update_llama_bin.bat
+# Previous llama.cpp build kept by kiln update
 llama-bin-backup/
 
 # Benchmark output
