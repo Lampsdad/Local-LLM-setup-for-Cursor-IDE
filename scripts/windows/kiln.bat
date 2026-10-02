@@ -523,9 +523,10 @@ if not defined PY_EXE (
     exit /b 1
 )
 :: Takes over this window until you quit it. A model started from it
-:: keeps serving afterwards -- every verb runs detached.
-%PY_EXE% "%~dp0..\tui.py" %2 %3 %4 %5
-exit /b %errorlevel%
+:: keeps serving afterwards -- every verb runs detached. U in it runs
+:: kiln self-update, which can rewrite this file, so the exit shares
+:: the line for the same reason as in :cmd_self_update above.
+%PY_EXE% "%~dp0..\tui.py" %2 %3 %4 %5 & exit /b !errorlevel!
 
 :cmd_bench
 call "%~dp0benchmark.bat"
