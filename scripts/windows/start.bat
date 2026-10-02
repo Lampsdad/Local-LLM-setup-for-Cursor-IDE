@@ -389,6 +389,14 @@ for /f "usebackq delims=" %%M in (`nvidia-smi "--query-gpu=memory.used,memory.to
 echo.
 
 :: ---- tunnel ----
+:: KILN_NO_TUNNEL=1 skips the tunnel: no public URL, though the LAN
+:: can still reach the port. The benchmark in kiln tui sets it, so
+:: measuring a setup never puts a server on the internet.
+if defined KILN_NO_TUNNEL (
+    echo  Tunnel skipped ^(KILN_NO_TUNNEL^) -- no public URL.
+    echo  Base URL: http://localhost:%PORT%/v1   ^(model: %ALIAS%^)
+    exit /b 0
+)
 if not exist "%CF_EXE%" (
     echo  cloudflared not found -- serving locally only.
     echo  Base URL: http://localhost:%PORT%/v1   ^(model: %ALIAS%^)

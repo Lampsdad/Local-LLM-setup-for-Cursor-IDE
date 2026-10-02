@@ -34,6 +34,19 @@ thing standing between an anonymous request and your GPU.
   into `main`. The status board's daily check lists tags with
   `git ls-remote` and downloads nothing. Set `KILN_NO_UPDATE_CHECK=1`
   to turn the check off.
+- `kiln tui` opens no network port. Its keys map to a fixed list of
+  kiln commands, so nothing typed into it reaches a command line. Its
+  benchmark starts every setup with the tunnel off (`KILN_NO_TUNNEL=1`)
+  and stops the server when it finishes, so measuring never puts a
+  server on a public URL.
+- To start without the tunnel yourself, press `l` in `kiln tui`, or set
+  `KILN_NO_TUNNEL=1` before `kiln start`. That removes the public URL.
+  llama-server still listens on your LAN, behind the key.
+- On Windows, a WSL or Docker container that publishes the same port
+  takes `127.0.0.1:8080` ahead of llama-server. The tunnel forwards to
+  `localhost`, so it would publish that program instead of the model.
+  `kiln tui` warns when it sees this, and finds llama-server by the
+  machine's name instead.
 
 ```bat
 kiln key show           :: print it (generates it on first use)

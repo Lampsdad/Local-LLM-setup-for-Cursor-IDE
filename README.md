@@ -230,6 +230,7 @@ kiln opencode     :: list the local models in OpenCode
 kiln bench        :: quant speed and throughput sweep
 kiln clean        :: reclaim disk from superseded GGUFs
 kiln self-update  :: update kiln itself to the newest release
+kiln tui          :: all of the above as a full-screen app
 ```
 
 ### macOS and Linux
@@ -251,6 +252,8 @@ Fedora/RHEL and calls the right platform script for you:
 ./kiln.sh stop
 ./kiln.sh key show
 ./kiln.sh self-update     # update kiln itself to the newest release
+./kiln.sh start --no-mtp  # trade the MTP head for a larger window
+./kiln.sh tui             # all of the above as a full-screen app
 ```
 
 Override the quant with an environment variable:
@@ -264,6 +267,76 @@ key. The shell path sizes context with llama.cpp's `--fit on` rather
 than the Windows probe, so no table lookup is needed there.
 `scripts/unix/slurm-llama.sh` runs the same server as a Slurm batch job
 so the GPU shows as allocated in `squeue`.
+
+### The full-screen app
+
+```bat
+kiln tui
+```
+
+`kiln tui` (`./kiln.sh tui`) is the status board as a full-screen
+terminal app. It shows what is installed, downloaded and running, the
+URL and key Cursor needs, what each model would cost on this GPU, and
+the same `Next:` step the board gives. Each key runs the matching kiln
+command and shows its output as it happens:
+
+```
+n  next step     s  start      x  stop        d  download
+b  benchmark     k  copy key   u  copy URL    ?  every key
+m  start with or without the MTP head   l  with or without the tunnel
+```
+
+A model you start from it keeps serving after you quit. It opens no
+network port, so it works over SSH too.
+
+It needs one library that is not part of Python:
+[Textual](https://textual.textualize.io). The first `kiln tui` offers
+to install it into `.kiln/` inside this folder and nowhere else. Delete
+that folder to remove it. It needs Python 3.9 or newer. The rest of
+kiln still runs on 3.8.
+
+### Finding the right setup for your GPU
+
+Press `b` in `kiln tui` to benchmark. It starts each downloaded model
+the way `kiln start` would, with and without the MTP head, and times
+real requests against it. The abliterated build is listed but not
+ticked unless it is the one you run: it is the same size and speed as
+the stock model, so measuring both tells you nothing about your GPU.
+
+| Column | What it measures |
+|---|---|
+| Context | the window the server actually opened |
+| Load | seconds from start to serving |
+| Prefill t/s | how fast it reads an 8K-token prompt |
+| Gen t/s | how fast it writes, which is the speed you notice in Cursor |
+| MTP accept | the share of drafted tokens the model kept |
+| Deep t/s | thorough runs only: writing speed with 32K tokens already in context |
+| VRAM | memory in use once loaded |
+
+It recommends the fastest setup that still opens at least 96K of context
+(`KILN_MIN_CTX` moves that bar), because Cursor's agent sends tens of
+thousands of tokens. MTP speed swings from run to run with how
+predictable the text is, so when another setup's runs overlap the
+pick's, it says the two are a tie rather than crowning one. Choose any
+row and press `a` to start it. It also becomes the default for `s`. A
+quick run takes about a minute and a half per setup. The tunnel stays
+off while it measures, and the server is stopped when it finishes.
+
+`p` copies the results as a markdown table, ready to paste into a
+[hardware report](https://github.com/Lampsdad/Local-LLM-setup-for-Cursor-IDE/issues/new?template=hardware_report.yml).
+The results are saved in `kiln-benchmark.json`. The same benchmark runs
+without the app:
+
+```
+python scripts/bench.py --list       # the setups on this machine
+python scripts/bench.py              # measure the ones --list marks
+python scripts/bench.py base-nomtp   # or name them
+python scripts/bench.py --report     # the last results, as markdown
+```
+
+`kiln bench` is a different tool. It sweeps quants, batch sizes and KV
+precision with llama-bench, which cannot run speculative decoding, so it
+does not show what MTP is worth.
 
 ### Keeping kiln up to date
 
@@ -612,6 +685,9 @@ NOTES.md               why the tuned constants are what they are
 | `hardware.py` | The model registry and the sizing arithmetic. Detects the GPU, picks model + quant + MTP + context, and generates the tables above. Used by every other script on both platforms. |
 | `opencode.py` | Writes the `kiln` provider into OpenCode's config. Detects Windows, WSL or Linux and works out the server URL. Behind `kiln opencode`. |
 | `selfupdate.py` | Fast-forwards the checkout to the newest release, or to `main` if you opted in. Refuses rather than overwrite local edits or commits. Behind `kiln self-update` and the board's `kiln` row. |
+| `control.py` | Reads the same state as the status board and runs kiln commands for `kiln tui` and the benchmark, from a fixed list. |
+| `bench.py` | The benchmark: starts each setup with `kiln start`, times real requests, recommends one. Also runs on its own. |
+| `tui.py` / `tui_app.py` | `kiln tui`. `tui.py` installs Textual into `.kiln/` on first run, and `tui_app.py` is the app. |
 
 **macOS and Linux** (`scripts/unix/`)
 
@@ -724,9 +800,10 @@ Cursor-specific setup steps differ. OpenCode gets a one-command setup:
 see [Using with OpenCode](#using-with-opencode).
 
 **How fast is it?** That depends on your card, quant and draft acceptance
-rate, so this repo ships a measurement path rather than a number:
-`kiln bench` (`./kiln.sh bench` on Unix). MTP speculative decoding is the single
-largest lever — confirm it engaged before comparing anything.
+rate, so this repo ships a measurement path rather than a number. The
+benchmark in `kiln tui` (press `b`) measures each setup as `kiln start`
+runs it, MTP included. MTP speculative decoding is the single largest
+lever — confirm it engaged before comparing anything.
 
 **Why Qwen3.8-27B and not a bigger model?** 27B at `UD-Q5_K_XL` is the
 largest capable coding model that fits a 32 GB card *while keeping the MTP

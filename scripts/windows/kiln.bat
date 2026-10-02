@@ -17,6 +17,7 @@ call "%~dp0lib_ui.bat"
 ::    kiln update          upgrade llama.cpp
 ::    kiln opencode        list the local models in OpenCode
 ::    kiln self-update     update kiln itself from GitHub
+::    kiln tui             full-screen app, with a benchmark
 ::    kiln bench | clean | help
 ::
 ::  Everything here delegates to the existing scripts, and none
@@ -46,6 +47,7 @@ if /I "%CMD%"=="hardware" goto :cmd_hardware
 if /I "%CMD%"=="hw"       goto :cmd_hardware
 if /I "%CMD%"=="opencode" goto :cmd_opencode
 if /I "%CMD%"=="self-update" goto :cmd_self_update
+if /I "%CMD%"=="tui"      goto :cmd_tui
 if /I "%CMD%"=="bench"    goto :cmd_bench
 if /I "%CMD%"=="clean"    goto :cmd_clean
 if /I "%CMD%"=="help"     goto :cmd_help
@@ -301,6 +303,7 @@ echo   %C_HL%5%C_0%  install or update   %C_MU%kiln setup, kiln update%C_0%
 echo   %C_HL%6%C_0%  what fits this GPU  %C_MU%kiln hardware%C_0%
 echo   %C_HL%7%C_0%  set up OpenCode     %C_MU%kiln opencode%C_0%
 echo   %C_HL%8%C_0%  update kiln itself  %C_MU%kiln self-update%C_0%
+echo   %C_HL%9%C_0%  full-screen app     %C_MU%kiln tui%C_0%
 echo   %C_HL%Q%C_0%  quit
 echo.
 set "SEL="
@@ -315,6 +318,7 @@ if "%SEL%"=="5" goto :cmd_setup
 if "%SEL%"=="6" goto :cmd_hardware
 if "%SEL%"=="7" goto :cmd_opencode
 if "%SEL%"=="8" goto :cmd_self_update
+if "%SEL%"=="9" goto :cmd_tui
 echo  %C_ERR%Not a choice.%C_0%
 echo.
 goto :menu
@@ -511,6 +515,18 @@ if not defined PY_EXE (
 :: one from before Python ran.
 %PY_EXE% "%~dp0..\selfupdate.py" %2 %3 & exit /b !errorlevel!
 
+:cmd_tui
+call :find_python
+if not defined PY_EXE (
+    echo  %C_ERR%Python not found.%C_0% kiln needs it for the TUI.
+    echo  Install Python 3.9+ from https://python.org
+    exit /b 1
+)
+:: Takes over this window until you quit it. A model started from it
+:: keeps serving afterwards -- every verb runs detached.
+%PY_EXE% "%~dp0..\tui.py" %2 %3 %4 %5
+exit /b %errorlevel%
+
 :cmd_bench
 call "%~dp0benchmark.bat"
 exit /b %errorlevel%
@@ -547,6 +563,8 @@ echo                           %C_AC%--url URL%C_0% to pin the server address
 echo   %C_AC%self-update%C_0%             update kiln itself to the newest release
 echo                           %C_AC%--main%C_0% to follow every change on main,
 echo                           %C_AC%--check%C_0% to only report what is available
+echo   %C_AC%tui%C_0%                     the status board and these commands as a
+echo                           full-screen app, with an interactive benchmark
 echo   %C_AC%bench%C_0%                   quant speed and throughput sweep
 echo   %C_AC%clean%C_0%                   reclaim disk from superseded GGUFs
 echo.

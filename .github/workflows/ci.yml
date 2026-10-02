@@ -55,6 +55,35 @@ jobs:
       - name: kiln self-update
         run: python3 .github/scripts/test_selfupdate.py
 
+      # kiln tui and the benchmark run kiln verbs; these pin that only
+      # the fixed table reaches a command line, and that a benchmark
+      # never opens a tunnel and always frees the GPU.
+      - name: control
+        run: python3 .github/scripts/test_control.py
+
+      - name: benchmark
+        run: python3 .github/scripts/test_bench.py
+
+  tui:
+    name: kiln tui
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Not the runner's system Python: PEP 668 refuses a pip install
+      # into it, which is also why kiln tui keeps Textual in a venv.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Textual, at the version tui.py asks for
+        run: |
+          req=$(python -c "import sys; sys.path.insert(0, 'scripts'); import tui; print(tui.REQUIREMENT)")
+          python -m pip install "$req"
+
+      - name: kiln tui
+        run: python .github/scripts/test_tui.py
+
   line-endings:
     name: Line endings
     runs-on: ubuntu-latest
