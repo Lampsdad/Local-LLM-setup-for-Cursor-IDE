@@ -105,8 +105,19 @@ done
 echo "Server is ready."
 
 # ── start cloudflared tunnel ─────────────────────────────────
-if ! command -v cloudflared &>/dev/null; then
-    echo "WARNING: cloudflared not found. Skipping tunnel."
+# KILN_NO_TUNNEL=1 skips the tunnel: no public URL, though the LAN
+# can still reach the port. The benchmark in kiln tui sets it, so
+# measuring a setup never puts a server on the internet.
+if [ -n "${KILN_NO_TUNNEL:-}" ] || ! command -v cloudflared &>/dev/null; then
+    if [ -n "${KILN_NO_TUNNEL:-}" ]; then
+        # This script leaves the tunnel up across restarts for a stable
+        # URL, so one may still be forwarding to this port. No tunnel
+        # means none.
+        pkill -f "cloudflared tunnel --url http://127.0.0.1:${PORT}" 2>/dev/null || true
+        echo "Tunnel skipped (KILN_NO_TUNNEL) -- no public URL."
+    else
+        echo "WARNING: cloudflared not found. Skipping tunnel."
+    fi
     echo "The API is reachable at http://localhost:$PORT/v1"
     echo "API key: $API_KEY"
     echo "Press Ctrl+C to stop the server."

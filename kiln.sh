@@ -6,11 +6,12 @@
 #    ./kiln.sh setup          llama.cpp + cloudflared + models/
 #    ./kiln.sh hardware       what this GPU can run
 #    ./kiln.sh get [base|ablit|9b|4b|both]
-#    ./kiln.sh start [base|ablit|9b|4b]
+#    ./kiln.sh start [base|ablit|9b|4b] [--no-mtp]
 #    ./kiln.sh stop           stop server and tunnel
 #    ./kiln.sh key [show|rotate]
 #    ./kiln.sh opencode       list the local models in OpenCode
 #    ./kiln.sh self-update    update kiln itself from GitHub
+#    ./kiln.sh tui            full-screen app, with a benchmark
 #    ./kiln.sh bench | quality | clean | help
 #
 #  This dispatches to the per-platform scripts in scripts/unix/.
@@ -184,8 +185,9 @@ usage() {
    get [base|ablit|9b|4b|both]
                      download weights; no argument takes the build
                      this GPU is sized for
-   start [base|ablit|9b|4b]
-                     serve a model to Cursor
+   start [base|ablit|9b|4b] [--no-mtp]
+                     serve a model to Cursor; --no-mtp trades the
+                     MTP draft head for a larger context window
    stop              stop llama-server and cloudflared
    key [show|rotate] the API key Cursor needs
    opencode          list the local models in OpenCode on this machine
@@ -194,6 +196,8 @@ usage() {
    self-update       update kiln itself to the newest release
                      (--main to follow every change on main,
                      --check to only report what is available)
+   tui               the status board and these commands as a
+                     full-screen app, with an interactive benchmark
    bench             speed benchmarks
    quality           KL-divergence of each quant vs Q8_0
    clean             reclaim space from superseded GGUFs
@@ -225,11 +229,19 @@ case "$CMD" in
         esac
         ;;
     start)
-        case "$ARG" in
-            ablit|base|9b|4b) exec env VARIANT="$ARG" "$START" ;;
-            "")         exec "$START" ;;
-            *)          echo "kiln: unknown variant '$ARG' (use base, ablit, 9b or 4b)" >&2; exit 1 ;;
-        esac
+        # Either order, as start.bat takes them: start ablit --no-mtp.
+        # The first variant wins, as it does there.
+        shift
+        WANT=""
+        for a in "$@"; do
+            case "$a" in
+                --no-mtp)         export KILN_NO_MTP=1 ;;
+                ablit|base|9b|4b) [ -n "$WANT" ] || WANT="$a" ;;
+                *)  echo "kiln: unknown start option '$a' (use base, ablit, 9b, 4b or --no-mtp)" >&2; exit 1 ;;
+            esac
+        done
+        if [ -n "$WANT" ]; then exec env VARIANT="$WANT" "$START"; fi
+        exec "$START"
         ;;
     stop)
         pkill -x llama-server 2>/dev/null && echo " stopped llama-server" || echo " llama-server was not running"
@@ -317,6 +329,14 @@ case "$CMD" in
         # just replaced.
         shift
         exec "$PY" "$ROOT/scripts/selfupdate.py" "$@"
+        ;;
+    tui)
+        if [ -z "$PY" ]; then
+            echo "kiln: needs python3 for the TUI." >&2
+            exit 1
+        fi
+        shift
+        exec "$PY" "$ROOT/scripts/tui.py" "$@"
         ;;
     bench)    exec "$UNIX/benchmark.sh" ;;
     quality)  exec "$UNIX/quality.sh" ;;

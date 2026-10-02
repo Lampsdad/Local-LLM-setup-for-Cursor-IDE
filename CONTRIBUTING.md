@@ -38,6 +38,7 @@ changes it with a preference.
 kiln.bat / kiln.sh     the front door
 scripts/windows/       everything cmd.exe runs
 scripts/unix/          everything macOS and Linux run
+scripts/*.py           shared Python: hardware.py, opencode.py, ...
 assets/                the wordmark
 ```
 
@@ -135,7 +136,15 @@ bash -n $(git ls-files '*.sh')
 shellcheck --severity=error $(git ls-files '*.sh')
 python3 .github/scripts/test_opencode.py
 python3 .github/scripts/test_selfupdate.py
+python3 .github/scripts/test_control.py
+python3 .github/scripts/test_bench.py
+python3 .github/scripts/test_tui.py    # app tests need Textual installed
 ```
+
+`kiln tui` runs kiln commands rather than reimplementing them. A new
+verb reaches it through `build_args` in `scripts/control.py`, the one
+place a request becomes a command line. Keep everything in it a literal
+or a registry key.
 
 Open an issue before a large change so you do not build something that
 does not fit the scope above.

@@ -8,6 +8,37 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`kiln tui`** (`./kiln.sh tui`) is the status board and the everyday
+  commands as a full-screen terminal app. You can start, switch and stop
+  models, download one, copy the URL and API key Cursor needs, set up
+  OpenCode, and update kiln, with each command's output shown as it
+  runs. It runs the same kiln commands rather than reimplementing them.
+  The first run offers to install Textual into `.kiln/`, a folder inside
+  the checkout. It needs Python 3.9+. A model started from it keeps
+  serving after you quit. It is also item 9 on the Windows menu.
+- **A benchmark in `kiln tui`** (press `b`, or `scripts/bench.py`)
+  starts each downloaded model with and without the MTP head through
+  `kiln start`, with the tunnel off. It times prefill, generation, MTP
+  acceptance and, on a thorough run, generation 32K tokens deep. Then it
+  recommends the fastest setup that keeps 96K of context, and starts
+  the one you pick. Setups whose runs overlap are called a tie, and the
+  abliterated build is only measured and picked if it is the one you
+  run. `p` copies the results as a markdown table for a hardware report.
+  Unlike `kiln bench`, it measures what MTP is worth.
+- **`KILN_NO_TUNNEL=1`** makes every start script skip the Cloudflare
+  tunnel. `l` in `kiln tui` sets it for the next start.
+- **`./kiln.sh start --no-mtp`** trades the MTP draft head for a larger
+  context window on macOS and Linux, as `kiln start --no-mtp` already
+  did on Windows.
+- **A warning when another program holds the server's port.** On
+  Windows a WSL or Docker container publishing 8080 takes
+  `127.0.0.1:8080` ahead of llama-server, so localhost and the tunnel
+  reach that program instead. `kiln tui` says so and finds the server by
+  the machine's name.
+- **`.github/scripts/test_control.py`, `test_bench.py` and
+  `test_tui.py`** run in CI. They check that only the fixed command list
+  reaches a command line, that a benchmark never opens a tunnel and
+  always frees the GPU, and that the app's keys do what they say.
 - **`kiln self-update`** (`./kiln.sh self-update`) updates kiln itself
   from GitHub. By default it moves to the newest `vX.Y.Z` release.
   `--main` follows every change on `main` instead and is remembered.

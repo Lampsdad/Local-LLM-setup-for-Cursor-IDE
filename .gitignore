@@ -24,3 +24,11 @@ llama-bin-backup/
 # Benchmark output
 benchmark_results.txt
 quant_quality.txt
+
+# kiln tui: its private venv (Textual), and benchmark results
+.kiln/
+kiln-benchmark.json
+kiln-benchmark.json.tmp
+
+# Python bytecode, from running the scripts directly
+__pycache__/

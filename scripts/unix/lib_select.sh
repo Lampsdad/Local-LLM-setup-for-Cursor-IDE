@@ -82,6 +82,12 @@ if [ "${V_MTP:-0}" = "1" ]; then
         MTP="./models/mtp-Qwen3.8-27B-Q4_0.gguf"
     fi
 fi
+# --no-mtp (kiln.sh sets KILN_NO_MTP=1) trades the draft head for
+# context: cleared here, before sizing, so the VRAM it would have used
+# becomes KV cache. Generation is roughly half as fast without it.
+if [ "${KILN_NO_MTP:-0}" = "1" ]; then
+    MTP=""
+fi
 if [ "${V_VISION:-0}" = "1" ]; then
     if [ -f "./models/mmproj-F16.gguf" ]; then
         MMPROJ="./models/mmproj-F16.gguf"
