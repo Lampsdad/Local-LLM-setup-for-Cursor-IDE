@@ -311,9 +311,13 @@ class Runner:
             pass
         finally:
             # Leave the GPU as free as we found it at worst. The pick is
-            # started on request, with the tunnel, by the caller.
-            self._step("Stopping the server")
-            self._stop()
+            # started on request, with the tunnel, by the caller. Stop
+            # even when nobody is left to hear about it: a front end
+            # that has quit fails the step, not the stop.
+            try:
+                self._step("Stopping the server")
+            finally:
+                self._stop()
         doc = None
         if self.results:
             doc = save(self.results, self.depth, self.ctl)

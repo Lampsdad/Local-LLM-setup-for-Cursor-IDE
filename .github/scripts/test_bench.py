@@ -420,6 +420,23 @@ class Run(unittest.TestCase):
         self.assertEqual(server.state, "stopped")
         self.assertEqual(events[-1], ("done", doc, True))
 
+    def test_the_server_is_stopped_after_the_front_end_has_gone(self):
+        # A front end that quit mid-run fails every emit after it.
+        server = FakeServer()
+        bench._post = server.post
+        control.locate = server.locate
+        opencode.probe = server.probe
+        ctl = FakeControl(server)
+
+        def gone(kind, *a):
+            if kind == "step" and a[0] == "Stopping the server":
+                raise RuntimeError("App is not running")
+
+        with self.assertRaises(RuntimeError):
+            bench.Runner(ctl, self.setups()[:1], "quick", gone).run()
+        self.assertEqual(ctl.calls[-1][0], "stop")
+        self.assertEqual(server.state, "stopped")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

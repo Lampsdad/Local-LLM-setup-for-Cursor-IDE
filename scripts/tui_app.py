@@ -1266,7 +1266,10 @@ class KilnApp(App):
         self.push_screen(Help())
 
     async def action_quit(self):
-        if isinstance(self.screen, BenchScreen) and self.screen.runner:
+        # Anywhere in the stack: ctrl+q still quits from the help
+        # screen or the command palette opened over a run.
+        if any(isinstance(s, BenchScreen) and s.runner
+               for s in self.screen_stack):
             self.notify("Cancel the benchmark first (c).", severity="warning")
             return
         running = [j for j in self.ctl.jobs.values()

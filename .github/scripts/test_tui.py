@@ -19,6 +19,7 @@ import contextlib
 import io
 import os
 import sys
+import threading
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -306,6 +307,38 @@ class App(unittest.TestCase):
         self.assertEqual(self.chosen, ["base-nomtp"])
         self.assertEqual(ctl.requests, [{"action": "start", "variant": "base",
                                          "no_mtp": True, "local": False}])
+
+    def test_no_quitting_from_a_dialog_over_a_running_benchmark(self):
+        class SlowRunner:
+            def __init__(self, ctl, chosen, depth, emit):
+                self.stopped = threading.Event()
+
+            def cancel(self):
+                self.stopped.set()
+
+            def run(self):
+                self.stopped.wait(20)
+
+        self.bench.Runner = SlowRunner
+
+        async def go(app, pilot):
+            await pilot.press("b")
+            await pilot.pause(0.1)
+            screen = app.screen
+            await pilot.press("r")
+            await pilot.pause(0.2)
+            self.assertIsNotNone(screen.runner)
+            # ctrl+q belongs to the app, so it reaches action_quit from
+            # the help screen too. Quitting there would leave the run's
+            # server behind.
+            await pilot.press("question_mark")
+            await pilot.pause(0.1)
+            await pilot.press("ctrl+q")
+            await pilot.pause(0.2)
+            self.assertTrue(app.is_running)
+            self.assertFalse(screen.runner.stopped.is_set())
+            screen.runner.cancel()
+        self.drive(go)
 
 
 if __name__ == "__main__":
