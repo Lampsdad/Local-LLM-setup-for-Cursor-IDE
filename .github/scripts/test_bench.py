@@ -420,6 +420,51 @@ class Run(unittest.TestCase):
         self.assertEqual(server.state, "stopped")
         self.assertEqual(events[-1], ("done", doc, True))
 
+    def test_cancel_mid_request_is_not_recorded_as_a_failure(self):
+        # Cancelling kills the start job and the server with it, so the
+        # request in flight fails. The setup did not.
+        server = FakeServer()
+        post = server.post
+
+        def dies_under_cancel(url, body, key, timeout=None):
+            if url.endswith("/completion") and len(server.requests) > 3:
+                runner.cancel()
+                server.stopped()
+                raise bench.Failed("request to completion failed: reset")
+            return post(url, body, key, timeout)
+
+        bench._post = dies_under_cancel
+        control.locate = server.locate
+        opencode.probe = server.probe
+        ctl = FakeControl(server)
+        runner = bench.Runner(ctl, self.setups(), "quick")
+        self.assertIsNone(runner.run())
+        self.assertIsNone(bench.load())
+        self.assertEqual(ctl.calls[-1][0], "stop")
+
+    def test_the_key_is_read_after_the_first_start_makes_it(self):
+        saved = opencode.KEY_FILE
+        self.addCleanup(setattr, opencode, "KEY_FILE", saved)
+        opencode.KEY_FILE = os.path.join(self.tmp.name, "api_key.txt")
+        server = FakeServer()
+        started, post = server.started, server.post
+
+        def makes_the_key(args, env):
+            if not os.path.exists(opencode.KEY_FILE):
+                with open(opencode.KEY_FILE, "w") as fh:
+                    fh.write("k3y")
+            started(args, env)
+
+        def wants_the_key(url, body, key, timeout=None):
+            if key != "k3y":
+                raise bench.Failed("%s answered 401" % url.rsplit("/", 1)[-1])
+            return post(url, body, key, timeout)
+
+        server.started, server.post = makes_the_key, wants_the_key
+        _, _, doc = self.run_bench(server, self.setups()[:1])
+        self.assertNotIn("error", doc["results"][0])
+        self.assertEqual(doc["results"][0]["gen_tps"], 85.0)
+
     def test_the_server_is_stopped_after_the_front_end_has_gone(self):
         # A front end that quit mid-run fails every emit after it.
         server = FakeServer()

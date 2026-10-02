@@ -369,11 +369,17 @@ class Runner:
                                        setup.args, {"KILN_NO_TUNNEL": "1"})
             self._wait_ready(started)
             result["load_s"] = round(time.time() - started, 1)
+            # Read now, not when the run began: on a machine that has
+            # never served, this first kiln start is what made the key.
+            self.key = opencode.read_key()
             info = opencode.probe(self.base + "/v1", self.key) or {}
             result["ctx"] = info.get("ctx", 0)
             result["vram_used_mib"] = vram_used_mib()
             result.update(self._requests(result["ctx"]))
         except Failed as e:
+            # Cancelling kills the server under a load or a request in
+            # progress. That is the run stopping, not this setup failing.
+            self._check()
             result["error"] = str(e)
             if self._job is not None:
                 tail = self._job.view(0)["text"].strip().splitlines()[-12:]
