@@ -6,9 +6,9 @@ OpenAI-compatible llama.cpp server with MTP speculative decoding, vision,
 and a 112K context window on a single 32 GB card — no subscription, no
 code leaving your machine. Stock or abliterated, picked at launch.
 
-[![CI](https://github.com/Lampsdad/Local-LLM-setup-for-Cursor-IDE/actions/workflows/ci.yml/badge.svg)](https://github.com/Lampsdad/Local-LLM-setup-for-Cursor-IDE/actions/workflows/ci.yml)
+[![CI](https://github.com/Lampsdad/kiln-local-llm/actions/workflows/ci.yml/badge.svg)](https://github.com/Lampsdad/kiln-local-llm/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/Lampsdad/Local-LLM-setup-for-Cursor-IDE?style=flat)](https://github.com/Lampsdad/Local-LLM-setup-for-Cursor-IDE/stargazers)
+[![Stars](https://img.shields.io/github/stars/Lampsdad/kiln-local-llm?style=flat)](https://github.com/Lampsdad/kiln-local-llm/stargazers)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
 ![llama.cpp](https://img.shields.io/badge/llama.cpp-b9180%2B-orange)
 ![Model](https://img.shields.io/badge/model-Qwen3.8--27B-purple)
@@ -177,8 +177,8 @@ KILN_MIN_CTX=200000 kiln hardware    # window over everything
 ### Windows
 
 ```bat
-git clone https://github.com/Lampsdad/Local-LLM-setup-for-Cursor-IDE
-cd Local-LLM-setup-for-Cursor-IDE
+git clone https://github.com/Lampsdad/kiln-local-llm
+cd kiln-local-llm
 kiln
 ```
 
@@ -237,8 +237,8 @@ kiln tui          :: all of the above as a full-screen app
 ### macOS and Linux
 
 ```bash
-git clone https://github.com/Lampsdad/Local-LLM-setup-for-Cursor-IDE
-cd Local-LLM-setup-for-Cursor-IDE
+git clone https://github.com/Lampsdad/kiln-local-llm
+cd kiln-local-llm
 ./kiln.sh
 ```
 
@@ -328,7 +328,7 @@ quick run takes about a minute and a half per setup. The tunnel stays
 off while it measures, and the server is stopped when it finishes.
 
 `p` copies the results as a markdown table, ready to paste into a
-[hardware report](https://github.com/Lampsdad/Local-LLM-setup-for-Cursor-IDE/issues/new?template=hardware_report.yml).
+[hardware report](https://github.com/Lampsdad/kiln-local-llm/issues/new?template=hardware_report.yml).
 The results are saved in `kiln-benchmark.json`. The same benchmark runs
 without the app:
 
