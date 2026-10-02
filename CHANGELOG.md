@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-10-01
+
 ### Added
 
 - **`kiln tui`** (`./kiln.sh tui`) is the status board and the everyday
@@ -206,4 +208,5 @@ place across every platform.
 - **2026-04-24** — Initial local model setup, Windows start scripts, and
   Cursor instructions.
 
+[1.1.0]: https://github.com/Lampsdad/Local-LLM-setup-for-Cursor-IDE/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Lampsdad/Local-LLM-setup-for-Cursor-IDE/releases/tag/v1.0.0
