@@ -120,7 +120,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   -v python3` resolves to the Microsoft Store alias stub, which exits 0
   and prints nothing, so every lookup silently fell back. `lib_python.sh`
   now verifies the interpreter answers, and strips the CR that Windows
-  Python puts on each line — a trailing `` made `V_MTP` compare unequal
+  Python puts on each line — a trailing `
+` made `V_MTP` compare unequal
   to `1` while still printing as `1`.
 - **The status board's "shared files" row** reported "no MTP head" on
   machines given the q4_0 head, because it matched the q8_0 filename only.
@@ -208,5 +209,5 @@ place across every platform.
 - **2026-04-24** — Initial local model setup, Windows start scripts, and
   Cursor instructions.
 
-[1.1.0]: https://github.com/Lampsdad/Local-LLM-setup-for-Cursor-IDE/releases/tag/v1.1.0
-[1.0.0]: https://github.com/Lampsdad/Local-LLM-setup-for-Cursor-IDE/releases/tag/v1.0.0
+[1.1.0]: https://github.com/Lampsdad/kiln-local-llm/releases/tag/v1.1.0
+[1.0.0]: https://github.com/Lampsdad/kiln-local-llm/releases/tag/v1.0.0
