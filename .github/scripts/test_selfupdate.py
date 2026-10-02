@@ -145,6 +145,29 @@ class ReleaseChannelTest(Base):
         self.assertIn("already past the newest", out)
         self.assertIn("--main", out)
 
+    def test_a_tag_deleted_on_github_is_not_followed(self):
+        # v1.20.0 was a typo for v1.2.0, deleted on GitHub after this
+        # clone fetched it. It must not outrank every later release.
+        typo = self.publish("kiln.sh", "two", tag="v1.20.0")
+        self.assertEqual(self.run_cli()[0], 0)
+        sh(self.dev, "tag", "-d", "v1.20.0")
+        sh(self.dev, "tag", "-a", "v1.2.0", "-m", "v1.2.0", typo)
+        sh(self.dev, "push", "--quiet", "origin", ":v1.20.0", "v1.2.0")
+        released = self.publish("kiln.sh", "three", tag="v1.3.0")
+        code, out = self.run_cli()
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.head(), released)
+
+    def test_a_tag_made_here_is_not_a_release(self):
+        released = self.publish("kiln.sh", "two", tag="v1.1.0")
+        sh(self.user, "switch", "--quiet", "-c", "experiment")
+        self.commit(self.user, "mine.txt", "mine")
+        sh(self.user, "tag", "v9.0.0")
+        sh(self.user, "switch", "--quiet", "main")
+        code, out = self.run_cli()
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.head(), released)
+
     def test_local_tags_survive_fetch_prune(self):
         # fetch.prune=true is a common setting, and on the tag refspec
         # the update fetches it would delete every tag GitHub lacks.

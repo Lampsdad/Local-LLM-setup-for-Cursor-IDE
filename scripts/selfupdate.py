@@ -221,18 +221,6 @@ def require_clean(root):
 
 # ---- what an update would move to ---------------------------
 
-def local_target(root, channel):
-    """(label, commit) from refs that have already been fetched."""
-    if channel == "main":
-        ref = "refs/remotes/%s/%s" % (REMOTE, BRANCH)
-        return BRANCH, git(root, "rev-parse", ref + "^{commit}")
-    tag = newest_release(git(root, "tag", "--list", "v*").splitlines())
-    if tag is None:
-        raise Refused("GitHub has no vX.Y.Z release to update to yet.\n"
-                      "To follow main instead:  %s self-update --main" % KILN)
-    return tag, git(root, "rev-parse", "refs/tags/%s^{commit}" % tag)
-
-
 def remote_target(root, channel, timeout):
     """(label, commit) as GitHub has it now. Reads refs only, fetches nothing."""
     out = git(root, "ls-remote", REMOTE, "refs/heads/" + BRANCH,
@@ -363,6 +351,15 @@ def update(root, channel=None):
     channel = get_channel(root)
 
     say("Fetching from GitHub...")
+    # The target is what GitHub lists now, not the newest tag in this
+    # clone. A tag deleted on GitHub, or one made here and never
+    # pushed, stays in the clone and would otherwise be updated to.
+    label, target = remote_target(root, channel, FETCH_TIMEOUT)
+    if label is None and channel == "main":
+        raise Refused("GitHub has no %s branch to update to." % BRANCH)
+    if label is None:
+        raise Refused("GitHub has no vX.Y.Z release to update to yet.\n"
+                      "To follow main instead:  %s self-update --main" % KILN)
     # Forced (+) so a tag moved on GitHub replaces the local copy
     # instead of failing the fetch with "would clobber existing tag".
     # --no-prune, or fetch.prune=true in the user's git config deletes
@@ -372,7 +369,6 @@ def update(root, channel=None):
         "+refs/heads/%s:refs/remotes/%s/%s" % (BRANCH, REMOTE, BRANCH),
         "+refs/tags/*:refs/tags/*", timeout=FETCH_TIMEOUT)
 
-    label, target = local_target(root, channel)
     # Fresh information, so the board's next check can use it.
     save_cache(root, channel, label, target)
     head = git(root, "rev-parse", "HEAD")
