@@ -247,6 +247,11 @@ class RefusalTest(Base):
         self.commit(self.user, "mine.txt", "mine")
         self.assertRefused(says="GitHub does not have")
 
+    def test_a_refused_switch_is_not_remembered(self):
+        self.commit(self.user, "mine.txt", "mine")
+        self.assertRefused("--main", says="GitHub does not have")
+        self.assertEqual(selfupdate.get_channel(self.user), "release")
+
     def test_another_branch(self):
         sh(self.user, "switch", "--quiet", "-c", "feature")
         self.assertRefused(says="branch 'feature'")
@@ -323,6 +328,19 @@ class NoticeTest(Base):
         sh(self.user, "remote", "set-url", "origin", self.path("gone.git"))
         self.assertEqual(self.notice(), {"KILN_VERSION": "v1.0.0"})
         self.assertTrue(os.path.exists(self.cache_file()))
+
+    def test_offline_keeps_a_known_update(self):
+        self.publish("kiln.sh", "two", tag="v1.1.0")
+        self.assertEqual(self.notice().get("KILN_UPDATE"), "v1.1.0")
+        with open(self.cache_file()) as fh:
+            cache = json.load(fh)
+        cache["checked"] -= selfupdate.CHECK_EVERY + 1
+        with open(self.cache_file(), "w") as fh:
+            json.dump(cache, fh)
+        sh(self.user, "remote", "set-url", "origin", self.path("gone.git"))
+        self.assertEqual(self.notice().get("KILN_UPDATE"), "v1.1.0")
+        # And the next render, inside the day, still says so.
+        self.assertEqual(self.notice().get("KILN_UPDATE"), "v1.1.0")
 
     def test_opt_out_never_asks(self):
         os.environ["KILN_NO_UPDATE_CHECK"] = "1"

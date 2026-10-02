@@ -304,8 +304,13 @@ def notice(root):
                 label, commit = remote_target(root, channel, CHECK_TIMEOUT)
             except Refused:
                 # Offline or GitHub is down. Remember that it was tried,
-                # so the board does not pay the timeout on every render.
-                label, commit = None, None
+                # so the board does not pay the timeout on every render,
+                # but keep what the last check found: one offline render
+                # must not hide a known update for a day.
+                if cache.get("channel") == channel:
+                    label, commit = cache.get("label"), cache.get("commit")
+                else:
+                    label, commit = None, None
             save_cache(root, channel, label, commit)
         if label and commit and behind(root, commit):
             print("KILN_UPDATE=" + board_safe(label))
@@ -343,13 +348,20 @@ def update(root, channel=None):
     require_clean(root)
 
     say("")
-    if channel and channel != get_channel(root):
+    saved = get_channel(root)
+    channel = channel or saved
+    code = fast_forward(root, channel)
+    # Remembered only once nothing refused: a refusal changes nothing,
+    # the channel included.
+    if channel != saved:
         git(root, "config", "--local", "kiln.channel", channel)
         other = "--release" if channel == "main" else "--main"
         say("Following %s from now on. To switch back:  %s self-update %s"
             % (channel_text(channel), KILN, other), "")
-    channel = get_channel(root)
+    return code
 
+
+def fast_forward(root, channel):
     say("Fetching from GitHub...")
     # The target is what GitHub lists now, not the newest tag in this
     # clone. A tag deleted on GitHub, or one made here and never
