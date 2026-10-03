@@ -2,7 +2,8 @@
 # ============================================================
 #  kiln -- macOS / Linux front door.
 #
-#    ./kiln.sh                status board
+#    ./kiln.sh                full-screen TUI
+#    ./kiln.sh status         status board
 #    ./kiln.sh setup          llama.cpp + cloudflared + models/
 #    ./kiln.sh hardware       what this GPU can run
 #    ./kiln.sh get [base|ablit|9b|4b|both]
@@ -14,13 +15,36 @@
 #    ./kiln.sh tui            full-screen app, with a benchmark
 #    ./kiln.sh bench | quality | clean | help
 #
+#  Bare `kiln` opens the TUI. `kiln status` prints the board.
 #  This dispatches to the per-platform scripts in scripts/unix/.
 #  It deliberately holds no launch logic of its own -- those
 #  scripts stay the single source of truth.
 # ============================================================
 set -uo pipefail
 
-ROOT="$(cd "$(dirname "$0")" && pwd)"
+# A ~/.local/bin/kiln symlink has to resolve to this checkout, not
+# to ~/.local/bin. macOS readlink has no -f on older releases, so
+# walk the chain. Relative targets are joined to the link's directory.
+_kiln_src="${BASH_SOURCE[0]}"
+_kiln_n=0
+while [ -L "$_kiln_src" ]; do
+    _kiln_n=$((_kiln_n + 1))
+    if [ "$_kiln_n" -gt 20 ]; then
+        echo "kiln: too many symlinks resolving ${_kiln_src}" >&2
+        exit 1
+    fi
+    _kiln_dir="$(cd -P "$(dirname "$_kiln_src")" && pwd -P)" || exit 1
+    _kiln_next="$(readlink "$_kiln_src")" || exit 1
+    case "$_kiln_next" in
+        /*) _kiln_src="$_kiln_next" ;;
+        *)  _kiln_src="${_kiln_dir}/${_kiln_next}" ;;
+    esac
+done
+ROOT="$(cd -P "$(dirname "$_kiln_src")" && pwd -P)" || {
+    echo "kiln: cannot find the repo from ${_kiln_src}" >&2
+    exit 1
+}
+unset _kiln_src _kiln_dir _kiln_next _kiln_n
 UNIX="$ROOT/scripts/unix"
 cd "$ROOT"
 
@@ -174,12 +198,31 @@ status() {
     printf '\n'
 }
 
+# No arguments open the TUI. A missing Python, or a non-terminal,
+# cannot run it: say why and print the board. stdin counts too --
+# `kiln </dev/null` still has a terminal stdout, and the app would
+# block waiting on it.
+open_tui() {
+    if [ ! -t 0 ] || [ ! -t 1 ]; then
+        echo "kiln: not a terminal, so the TUI cannot start. Showing the status board." >&2
+        status
+        return 0
+    fi
+    if [ -z "$PY" ]; then
+        echo "kiln: no Python, so the TUI cannot start. Showing the status board." >&2
+        status
+        return 0
+    fi
+    exec "$PY" "$ROOT/scripts/tui.py"
+}
+
 usage() {
     cat <<'USAGE'
 
- Usage:  ./kiln.sh COMMAND [ARGUMENT]
+ Usage:  kiln COMMAND [ARGUMENT]     (./kiln.sh is the same command)
 
-   status            what is installed, downloaded and running
+   status            print the status board: what is installed,
+                     downloaded and running
    setup             llama.cpp, cloudflared and models/
    hardware          what this GPU can run, and at what context
    get [base|ablit|9b|4b|both]
@@ -196,23 +239,27 @@ usage() {
    self-update       update kiln itself to the newest release
                      (--main to follow every change on main,
                      --check to only report what is available)
-   tui               the status board and these commands as a
-                     full-screen app, with an interactive benchmark
+   tui               full-screen app, with an interactive benchmark
+                     (the default: kiln with no command does this)
    bench             speed benchmarks
    quality           KL-divergence of each quant vs Q8_0
    clean             reclaim space from superseded GGUFs
    help              this text
 
- With no command, kiln prints the status board.
+ With no command, kiln opens the TUI.
+ kiln status prints the status board.
+ If the TUI cannot start (no Python, or not a terminal), kiln
+ prints a short reason and then the status board.
 
 USAGE
 }
 
-CMD="${1:-status}"
+CMD="${1:-}"
 ARG="${2:-}"
 
 case "$CMD" in
-    status|"")  status ;;
+    "")         open_tui ;;
+    status)     status ;;
     setup)      exec "$INSTALL" ;;
     get)
         case "$ARG" in

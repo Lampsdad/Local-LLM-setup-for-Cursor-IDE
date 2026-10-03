@@ -1,67 +1,28 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR/../.."
 
 echo "============================================================"
-echo " Local Model Runtime - Linux Install (NVIDIA CUDA)"
+echo " Local Model Runtime - Linux Install (Vulkan)"
 echo "============================================================"
 echo
 
 # ── CUDA check ───────────────────────────────────────────────
 if ! command -v nvidia-smi &>/dev/null; then
-    echo "WARNING: nvidia-smi not found. Install the NVIDIA driver and CUDA toolkit first."
-    echo "         Continuing, but the server will run on CPU only."
+    echo "WARNING: nvidia-smi not found. The Vulkan build can still use an NVIDIA driver."
+    echo "         Without one, this install falls through to the CPU build."
 else
     echo "[OK] NVIDIA GPU detected: $(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)"
 fi
 
 # ── llama-bin ────────────────────────────────────────────────
-if [ -f "llama-bin/llama-server" ]; then
-    echo "[OK] llama-bin/ already populated, skipping download."
-else
-    echo "[*] Fetching latest llama.cpp release from GitHub..."
-    mkdir -p llama-bin
-
-    ASSET_URL=$(curl -fsSL https://api.github.com/repos/ggml-org/llama.cpp/releases/latest \
-        | python3 -c "
-import re, sys, json
-rel = json.load(sys.stdin)
-assets = rel.get('assets', [])
-# New releases ship .tar.gz (not .zip). Prefer Vulkan on NVIDIA Linux when no CUDA tarball.
-patterns = [
-    (r'bin-ubuntu-vulkan-x64\.tar\.gz$', 'vulkan'),
-    (r'bin-ubuntu-x64\.tar\.gz$', 'cpu'),
-]
-for pat, _ in patterns:
-    for a in assets:
-        name = a.get('name', '')
-        if re.search(pat, name, re.IGNORECASE):
-            print(a['browser_download_url']); sys.exit(0)
-print('NOT_FOUND'); sys.exit(1)
-")
-
-    if [ "$ASSET_URL" = "NOT_FOUND" ]; then
-        echo "ERROR: Could not find a Linux x64 asset in the latest release."
-        echo "Download manually from: https://github.com/ggml-org/llama.cpp/releases/latest"
-        echo "Extract into llama-bin/"
-        exit 1
-    fi
-
-    FILENAME=$(basename "$ASSET_URL")
-    echo "Downloading $FILENAME..."
-    curl -fL "$ASSET_URL" -o "llama-bin/$FILENAME"
-    tar -xzf "llama-bin/$FILENAME" -C llama-bin
-    rm "llama-bin/$FILENAME"
-    # Flatten: releases unpack to llama-<tag>/ with binaries inside
-    SUBDIR=$(find llama-bin -maxdepth 1 -type d -name 'llama-*' | head -1)
-    if [ -n "$SUBDIR" ] && [ -f "$SUBDIR/llama-server" ]; then
-        ln -sf "$(basename "$SUBDIR")/llama-server" llama-bin/llama-server
-        ln -sf "$(basename "$SUBDIR")/llama-cli" llama-bin/llama-cli
-    fi
-    chmod +x llama-bin/llama-server llama-bin/llama-cli 2>/dev/null || true
-    find llama-bin -name 'llama-server' -type f -exec chmod +x {} \;
-    echo "[OK] llama.cpp binaries extracted."
-fi
+# Vulkan, not the CUDA tarball. This script is the WSL path, and the
+# Ubuntu CUDA build is the wrong package there. The tag lookup is
+# shared with Fedora: /releases/latest no longer ships binaries.
+# shellcheck source=lib_llama_bin.sh
+. "$SCRIPT_DIR/lib_llama_bin.sh"
+kiln_install_llama_bin vulkan
 
 # ── cloudflared ──────────────────────────────────────────────
 if command -v cloudflared &>/dev/null; then
@@ -79,6 +40,13 @@ fi
 # ── models dir ───────────────────────────────────────────────
 mkdir -p models
 echo "[OK] models/ directory ready."
+
+# ── kiln on PATH ─────────────────────────────────────────────
+# Symlink, not a copy: kiln.sh walks the link back to this checkout,
+# so `kiln` works from any directory. ~/.local/bin, no sudo.
+mkdir -p "${HOME}/.local/bin"
+ln -sfn "$(pwd -P)/kiln.sh" "${HOME}/.local/bin/kiln"
+echo "[OK] kiln command: ~/.local/bin/kiln"
 
 echo
 echo "============================================================"

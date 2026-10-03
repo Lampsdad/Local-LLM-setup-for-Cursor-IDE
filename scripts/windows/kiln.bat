@@ -6,8 +6,8 @@ call "%~dp0lib_ui.bat"
 :: ============================================================
 ::  kiln -- one front door for this repo.
 ::
-::    kiln                 status board, then a menu
-::    kiln status          status board only
+::    kiln                 full-screen TUI
+::    kiln status          status board
 ::    kiln setup           llama.cpp + cloudflared + models\
 ::    kiln get [base|ablit|both]
 ::    kiln start [base|ablit]
@@ -33,7 +33,7 @@ set "CMD=%~1"
 set "ARG=%~2"
 set "ARG2=%~3"
 
-if not defined CMD        goto :board_and_menu
+if not defined CMD        goto :cmd_default
 if /I "%CMD%"=="status"   goto :cmd_status
 if /I "%CMD%"=="setup"    goto :cmd_setup
 if /I "%CMD%"=="get"      goto :cmd_get
@@ -57,6 +57,31 @@ if /I "%CMD%"=="--help"   goto :cmd_help
 echo.
 echo  %C_ERR%Unknown command:%C_0% %CMD%
 goto :cmd_help
+
+
+:: ============================================================
+::  no arguments: the TUI, same launch as `kiln tui`
+::  No Python, or not a terminal, cannot run it. Say why and
+::  print the board. Do not fall through into the old menu:
+::  that waits for a key and would hang with stdin closed.
+:: ============================================================
+:cmd_default
+call :find_python
+if not defined PY_EXE (
+    echo.
+    echo  %C_ERR%Python not found.%C_0% The TUI needs it. Showing the status board.
+    echo.
+    goto :cmd_status
+)
+:: Do not redirect stdout here: that would make isatty() false.
+%PY_EXE% -c "import sys; raise SystemExit(0 if sys.stdin.isatty() and sys.stdout.isatty() else 1)" 2>nul
+if errorlevel 1 (
+    echo.
+    echo  kiln: not a terminal, so the TUI cannot start. Showing the status board.
+    echo.
+    goto :cmd_status
+)
+goto :cmd_tui
 
 
 :: ============================================================
@@ -292,7 +317,7 @@ exit /b 0
 
 
 :: ============================================================
-::  menu (no-argument mode)
+::  numbered menu. Bare `kiln` no longer lands here.
 :: ============================================================
 :menu
 echo   %C_HL%1%C_0%  start a model       %C_MU%kiln start%C_0%
@@ -564,12 +589,14 @@ echo                           %C_AC%--url URL%C_0% to pin the server address
 echo   %C_AC%self-update%C_0%             update kiln itself to the newest release
 echo                           %C_AC%--main%C_0% to follow every change on main,
 echo                           %C_AC%--check%C_0% to only report what is available
-echo   %C_AC%tui%C_0%                     the status board and these commands as a
-echo                           full-screen app, with an interactive benchmark
+echo   %C_AC%tui%C_0%                     full-screen app, with an interactive benchmark
+echo                           ^(the default: kiln with no command does this^)
 echo   %C_AC%bench%C_0%                   quant speed and throughput sweep
 echo   %C_AC%clean%C_0%                   reclaim disk from superseded GGUFs
 echo.
-echo  %C_MU%With no command, kiln prints the status board and a menu.%C_0%
+echo  %C_MU%With no command, kiln opens the TUI.%C_0%
+echo  %C_MU%kiln status prints the status board.%C_0%
+echo  %C_MU%If the TUI cannot start, kiln prints the board instead.%C_0%
 echo  %C_MU%Set NO_COLOR=1 to disable colour.%C_0%
 echo.
 exit /b 0

@@ -6,6 +6,38 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Cursor follows the quick tunnel.** `scripts/unix/cursor_tunnel.sh`
+  starts cloudflared and writes the new `*.trycloudflare.com` host into
+  Cursor's OpenAI base URL, with the API-key workaround on. Stopping
+  the tunnel turns that workaround off and clears a trycloudflare URL.
+  Cursor's saved key is left as it is: the desktop encrypts it.
+
+### Changed
+
+- **Bare `kiln` opens the TUI.** `kiln` with no arguments (`./kiln.sh`
+  on macOS and Linux) starts the full-screen app. `kiln status` still
+  prints the status board. If the TUI cannot start — no Python, or the
+  output is not a terminal — kiln says why and prints the board instead
+  of hanging. Unix setup links `kiln` to `~/.local/bin/kiln` without
+  sudo. That link resolves back to the checkout, so the command works
+  from any directory.
+
+### Fixed
+
+- **Fedora setup no longer downloads a Vulkan build from `/releases/latest`.**
+  That URL is the empty v0.x line, so `./kiln.sh setup` on Fedora found
+  nothing. An NVIDIA card now gets the Ubuntu CUDA build whose toolkit
+  the driver can load (12.8 unless the driver reports 13.4 or newer),
+  plus the separate cudart tarball. Fedora does not ship those libraries,
+  and the server looks for them beside the binary. No NVIDIA card still
+  falls through to Vulkan, then CPU. The WSL/Linux installer keeps
+  Vulkan and uses the same bNNNN tag lookup.
+- **`./kiln.sh get` on Fedora and Debian.** A plain `pip install` into
+  the system Python is refused there. The download uses `huggingface_hub`
+  when it is already installed, and otherwise installs it for the user.
+
 ## [1.1.0] — 2026-10-01
 
 ### Added

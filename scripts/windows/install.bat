@@ -103,7 +103,7 @@ echo    kiln update      -- upgrade llama.cpp if MTP is unavailable
 echo    kiln get both    -- stock and abliterated weights
 echo    kiln start       -- pick one and serve it
 echo.
-echo  Or just run  kiln  for a status board and a menu.
+echo  Or just run  kiln  to open the TUI. kiln status prints the board.
 echo ============================================================
 echo.
 pause

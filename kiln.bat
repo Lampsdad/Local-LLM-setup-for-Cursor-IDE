@@ -6,7 +6,8 @@
 ::  libraries it calls. This shim exists so the command you type
 ::  sits at the root of the repo.
 ::
-::    kiln            status board, then a menu
+::    kiln            full-screen TUI
+::    kiln status     status board
 ::    kiln setup      install llama.cpp + cloudflared
 ::    kiln get both   download the weights
 ::    kiln start      serve a model to Cursor

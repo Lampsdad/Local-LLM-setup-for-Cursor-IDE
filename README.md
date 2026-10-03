@@ -17,9 +17,10 @@ code leaving your machine. Stock or abliterated, picked at launch.
 kiln
 ```
 
-One command on Windows. It prints what is installed, downloaded and
-running, tells you the one thing to do next, and gives you a menu.
-macOS and Linux use the same front door: `./kiln.sh` (same verbs).
+One command. Bare `kiln` opens the full-screen TUI. `kiln status`
+prints what is installed, downloaded and running. macOS and Linux use
+the same front door: `./kiln.sh` (same verbs). Setup links `kiln` into
+`~/.local/bin`.
 
 **Contents** — [Why not Ollama?](#why-not-just-use-ollama-or-lm-studio) ·
 [Will this run on my GPU?](#will-this-run-on-my-gpu) ·
@@ -182,8 +183,9 @@ cd kiln-local-llm
 kiln
 ```
 
-That is the whole install. `kiln` prints a status board, tells you the
-one thing to do next, and gives you a menu:
+That is the whole install. Bare `kiln` opens the full-screen TUI.
+`kiln status` prints the status board, which tells you the one thing
+to do next:
 
 ```
   _     _  _        
@@ -239,14 +241,18 @@ kiln tui          :: all of the above as a full-screen app
 ```bash
 git clone https://github.com/Lampsdad/kiln-local-llm
 cd kiln-local-llm
-./kiln.sh
+./kiln.sh                 # full-screen TUI
 ```
 
-Same verbs, same order. `kiln.sh` detects macOS, Debian/Ubuntu or
-Fedora/RHEL and calls the right platform script for you:
+Bare `./kiln.sh` opens the TUI. `./kiln.sh status` prints the status
+board. `./kiln.sh setup` links `kiln` into `~/.local/bin` (no sudo), so
+the same commands then work from any directory as `kiln`. Same verbs,
+same order. `kiln.sh` detects macOS, Debian/Ubuntu or Fedora/RHEL and
+calls the right platform script for you:
 
 ```bash
-./kiln.sh setup           # llama.cpp, cloudflared, models/
+./kiln.sh status          # print the status board
+./kiln.sh setup           # llama.cpp, cloudflared, models/; links kiln onto PATH
 ./kiln.sh hardware        # what this GPU can run, and at what context
 ./kiln.sh get both        # download the stock and abliterated weights
 ./kiln.sh start           # serve a model to Cursor
@@ -258,7 +264,7 @@ Fedora/RHEL and calls the right platform script for you:
 ./kiln.sh quality         # KL-divergence of each quant vs Q8_0
 ./kiln.sh self-update     # update kiln itself to the newest release
 ./kiln.sh start --no-mtp  # trade the MTP head for a larger window
-./kiln.sh tui             # all of the above as a full-screen app
+./kiln.sh tui             # full-screen app, which is also the default
 ```
 
 Override the quant with an environment variable:
@@ -279,8 +285,8 @@ so the GPU shows as allocated in `squeue`.
 kiln tui
 ```
 
-`kiln tui` (`./kiln.sh tui`) is the status board as a full-screen
-terminal app. It shows what is installed, downloaded and running, the
+Bare `kiln` opens this app. `kiln status` prints the board. `kiln tui`
+(`./kiln.sh tui`) is the same full-screen view of the status board. It shows what is installed, downloaded and running, the
 URL and key Cursor needs, what each model would cost on this GPU, and
 the same `Next:` step the board gives. Each key runs the matching kiln
 command and shows its output as it happens:
@@ -664,7 +670,7 @@ NOTES.md               why the tuned constants are what they are
 |---|---|
 | `kiln.bat` | Windows front door. A shim onto `scripts/windows/kiln.bat`. |
 | `kiln.sh` | macOS/Linux front door. Detects the platform and dispatches to `scripts/unix/`. |
-| `scripts/windows/kiln.bat` | The real CLI: status board, menu, and a verb for every step. |
+| `scripts/windows/kiln.bat` | The real CLI. No arguments open the TUI; `status` prints the board. |
 
 **Windows** (`scripts/windows/`)
 
