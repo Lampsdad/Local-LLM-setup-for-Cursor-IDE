@@ -74,6 +74,13 @@ fi
 mkdir -p models
 echo "[OK] models/ directory ready."
 
+# ── kiln on PATH ─────────────────────────────────────────────
+# Symlink, not a copy: kiln.sh walks the link back to this checkout,
+# so `kiln` works from any directory. ~/.local/bin, no sudo.
+mkdir -p "${HOME}/.local/bin"
+ln -sfn "$(pwd -P)/kiln.sh" "${HOME}/.local/bin/kiln"
+echo "[OK] kiln command: ~/.local/bin/kiln"
+
 echo
 echo "============================================================"
 echo " Setup complete! Next steps:"

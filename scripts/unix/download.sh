@@ -116,11 +116,30 @@ fi
 echo "============================================================"
 echo
 
-echo "[*] Installing huggingface_hub..."
-"$KILN_PY" -m pip install -q "huggingface_hub>=0.22" hf_transfer
-
-# hf_transfer materially speeds up multi-GB downloads on fast links.
-export HF_HUB_ENABLE_HF_TRANSFER=1
+# Fedora and Debian refuse a plain pip install into the system
+# interpreter (PEP 668). Use huggingface_hub if it is already
+# importable. Otherwise try a normal install, then a user install
+# that is allowed to touch an externally managed environment.
+if "$KILN_PY" -c 'import huggingface_hub' >/dev/null 2>&1; then
+    echo "[OK] huggingface_hub already available."
+else
+    echo "[*] Installing huggingface_hub..."
+    if ! "$KILN_PY" -m pip install -q "huggingface_hub>=0.22"; then
+        echo "[*] System pip refused the install. Retrying for this user only."
+        "$KILN_PY" -m pip install -q --user --break-system-packages "huggingface_hub>=0.22"
+    fi
+fi
+# Optional. A missing module makes huggingface_hub abort the whole
+# download when this variable is set, so only turn it on when the
+# import works. Failure to install it is not fatal.
+if ! "$KILN_PY" -c 'import hf_transfer' >/dev/null 2>&1; then
+    "$KILN_PY" -m pip install -q --user --break-system-packages hf_transfer >/dev/null 2>&1 || true
+fi
+if "$KILN_PY" -c 'import hf_transfer' >/dev/null 2>&1; then
+    export HF_HUB_ENABLE_HF_TRANSFER=1
+else
+    echo "[*] hf_transfer is not installed. The download still works, just slower."
+fi
 
 mkdir -p models
 
