@@ -75,6 +75,8 @@ for rel in rels:
     def cuda_pair():
         # A 13.4 binary will not start on a driver that only speaks 13.0.
         # 12.8 is the oldest toolkit with Blackwell (sm_120) kernels.
+        # Only accept a toolkit when the matching cudart tarball is
+        # present too; otherwise try the next version, then Vulkan.
         prefer = "13.4" if cuda and ver(cuda) >= ver("13.4") else "12.8"
         order = [prefer] + [v for v in ("12.8", "13.4") if v != prefer]
         for v in order:
@@ -82,12 +84,15 @@ for rel in rels:
             if not name:
                 continue
             cudart = find(r"^cudart-llama-b\d+-bin-ubuntu-cuda-" + re.escape(v) + r"-x64\.tar\.gz$")
-            return name, cudart
+            if cudart:
+                return name, cudart
         name = find(r"^llama-b\d+-bin-ubuntu-cuda-[\d.]+-x64\.tar\.gz$")
         if not name:
             return "", ""
         m = re.search(r"cuda-([\d.]+)-x64", name)
         cudart = find(r"^cudart-llama-b\d+-bin-ubuntu-cuda-" + re.escape(m.group(1)) + r"-x64\.tar\.gz$") if m else ""
+        if not cudart:
+            return "", ""
         return name, cudart
 
     kind, bin_name, cudart_name = "", "", ""
